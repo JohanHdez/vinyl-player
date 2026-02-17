@@ -1,0 +1,50 @@
+<div class="trending-section">
+  <div class="trending-header">
+    <svg viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+    <span class="header-text">Hits Mundiales</span>
+  </div>
+
+  @if (loading) {
+    <div class="trending-grid">
+      @for (item of skeletonItems; track $index) {
+        <div class="trending-card skeleton-card">
+          <div class="card-thumb-wrap skeleton-thumb"></div>
+          <div class="card-info">
+            <div class="skeleton-title"></div>
+            <div class="skeleton-channel"></div>
+          </div>
+        </div>
+      }
+    </div>
+  } @else if (songs.length === 0) {
+    <div class="trending-empty">
+      <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+      <p>No se pudieron cargar las tendencias</p>
+    </div>
+  } @else {
+    <div class="trending-grid">
+      @for (song of songs; track song.videoId; let i = $index) {
+        <div class="trending-card" (click)="onPlay(song)" [style.animation-delay]="(i * 50) + 'ms'">
+          <div class="card-thumb-wrap">
+            <img [src]="thumbUrl(song.videoId)" [alt]="song.title" class="card-thumb" loading="lazy">
+            <div class="card-overlay">
+              <div class="play-circle">
+                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              </div>
+            </div>
+            <div class="card-gradient"></div>
+          </div>
+          <div class="card-info">
+            <div class="card-title">{{ song.title }}</div>
+            <div class="card-meta">
+              <span class="card-channel">{{ song.channel }}</span>
+              <button class="card-add-btn" (click)="onAdd($event, song)" title="Agregar a lista">
+                <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>

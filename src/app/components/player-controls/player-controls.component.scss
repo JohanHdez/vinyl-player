@@ -1,0 +1,342 @@
+.bar-layout {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+
+  &.controls-disabled {
+    .play-btn, .ctrl-btn {
+      &:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+        &:hover { transform: none; box-shadow: none; }
+      }
+    }
+    .progress-bar.disabled { cursor: not-allowed; }
+  }
+}
+
+.bar-thumb {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 0 0 2px rgba(200, 152, 76, 0.08);
+  transition: box-shadow 0.3s;
+
+  &--playing {
+    animation: miniVinylSpin 3s linear infinite;
+    box-shadow: 0 0 0 2px rgba(196, 75, 63, 0.25), 0 0 16px rgba(196, 75, 63, 0.1);
+  }
+}
+
+@keyframes miniVinylSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumb-vinyl-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    box-shadow: 0 0 0 1px rgba(200, 152, 76, 0.1);
+  }
+}
+
+.thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    width: 22px;
+    height: 22px;
+    fill: var(--text-tertiary);
+  }
+}
+
+.bar-info {
+  flex: 0 0 180px;
+  min-width: 0;
+
+  .song-title {
+    font-size: 0.88rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+  }
+
+  .song-artist {
+    font-size: 0.73rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+}
+
+.bar-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.ctrl-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.2s, transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 50%;
+
+  &:hover:not(:disabled) {
+    color: var(--text-primary);
+    transform: scale(1.15);
+  }
+
+  &.active {
+    color: var(--accent-brass);
+  }
+
+  svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+  }
+}
+
+.play-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 20px rgba(196, 75, 63, 0.25);
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    transform: scale(1.1);
+    box-shadow: 0 6px 28px rgba(196, 75, 63, 0.35);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  svg {
+    width: 20px;
+    height: 20px;
+    fill: white;
+  }
+}
+
+.bar-progress {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.time-label {
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  width: 36px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(200, 152, 76, 0.06);
+  border-radius: 2px;
+  cursor: pointer;
+  position: relative;
+  transition: height 0.15s;
+
+  &:hover {
+    height: 6px;
+  }
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-red), var(--accent-brass));
+  border-radius: 2px;
+  transition: width 0.2s linear;
+  position: relative;
+  z-index: 2;
+}
+
+.progress-hover-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(200, 152, 76, 0.08);
+  border-radius: 2px;
+  z-index: 1;
+  transition: width 0.05s linear;
+}
+
+.progress-thumb {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  background: var(--text-primary);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+}
+
+.progress-tooltip {
+  position: absolute;
+  bottom: 16px;
+  transform: translateX(-50%);
+  background: rgba(14, 11, 9, 0.92);
+  backdrop-filter: blur(4px);
+  color: var(--text-primary);
+  font-size: 0.68rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 4;
+  pointer-events: none;
+  border: 1px solid var(--glass-border);
+}
+
+.bar-volume {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+
+  svg {
+    width: 16px;
+    height: 16px;
+    fill: var(--text-secondary);
+  }
+}
+
+.volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 90px;
+  height: 4px;
+  background: rgba(200, 152, 76, 0.08);
+  border-radius: 2px;
+  outline: none;
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent-brass);
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(200, 152, 76, 0.3);
+    transition: transform 0.15s;
+
+    &:hover {
+      transform: scale(1.2);
+    }
+  }
+
+  &::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent-brass);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 6px rgba(200, 152, 76, 0.3);
+  }
+}
+
+@media (max-width: 768px) {
+  .bar-layout {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .bar-thumb {
+    width: 40px;
+    height: 40px;
+  }
+
+  .bar-info {
+    flex: 1 1 0;
+    min-width: 80px;
+  }
+
+  .bar-controls {
+    order: 0;
+  }
+
+  .bar-progress {
+    flex: 1 1 100%;
+    order: 1;
+  }
+
+  .bar-volume {
+    display: none;
+  }
+
+  .ctrl-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .play-btn {
+    width: 36px;
+    height: 36px;
+
+    svg {
+      width: 18px;
+      height: 18px;
+    }
+  }
+}

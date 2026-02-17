@@ -1,0 +1,51 @@
+<div class="jam-panel">
+  <div class="jam-header">
+    <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+    Jam Activo
+  </div>
+
+  <!-- Now Playing -->
+  @if (currentSong()) {
+    <div class="now-playing">
+      <div class="now-playing-label">Reproduciendo:</div>
+      <div class="now-playing-info">
+        <img [src]="thumbUrl()" alt="" class="now-playing-thumb">
+        <div class="now-playing-text">
+          <div class="now-playing-title">{{ currentSong()!.title }}</div>
+          <div class="now-playing-channel">{{ currentSong()!.channel }}</div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <div class="jam-code-section">
+    <span class="jam-code-label">Codigo:</span>
+    <span class="jam-code">{{ sessionCode() }}</span>
+    <button class="copy-btn" (click)="copyCode()" title="Copiar codigo">
+      <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+    </button>
+  </div>
+
+  <div class="qr-wrap">
+    <canvas #qrCanvas></canvas>
+  </div>
+
+  <div class="participants-section">
+    <div class="participants-label">Participantes ({{ participants().length }})</div>
+    <div class="participants-list">
+      @for (p of participants(); track p.id; let i = $index) {
+        <div class="participant">
+          <div class="participant-avatar" [style.background]="avatarColor(i)">
+            {{ avatarInitial(p.name) }}
+          </div>
+          <span class="participant-name">{{ p.name }}</span>
+          @if (p.isHost) {
+            <span class="host-badge">Host</span>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  <button class="leave-btn" (click)="leaveSession()">Dejar sesion</button>
+</div>

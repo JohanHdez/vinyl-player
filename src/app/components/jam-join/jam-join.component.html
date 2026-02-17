@@ -1,0 +1,36 @@
+@if (isOpen) {
+  <div class="jam-join-overlay" (click)="close()">
+    <div class="jam-join-dialog" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+        Unirse a Jam
+      </div>
+
+      <div class="dialog-body">
+        <label class="field-label">Codigo de sesion</label>
+        <input
+          type="text"
+          class="field-input"
+          placeholder="Ej: ABC123"
+          [(ngModel)]="code"
+          maxlength="6"
+          (keydown.enter)="join()"
+        />
+
+        <label class="field-label">Tu nombre</label>
+        <input
+          type="text"
+          class="field-input"
+          placeholder="Invitado"
+          [(ngModel)]="name"
+          (keydown.enter)="join()"
+        />
+      </div>
+
+      <div class="dialog-actions">
+        <button class="cancel-btn" (click)="close()">Cancelar</button>
+        <button class="join-btn" (click)="join()" [disabled]="!code.trim()">Unirse</button>
+      </div>
+    </div>
+  </div>
+}

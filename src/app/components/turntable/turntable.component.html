@@ -1,0 +1,42 @@
+<div class="turntable" [class.turntable--playing]="isPlaying">
+  <!-- Ambient warm glow -->
+  <div class="turntable-glow"></div>
+
+  <!-- Wooden plinth -->
+  <div class="turntable-plinth">
+    <div class="plinth-grain"></div>
+    <div class="plinth-edge"></div>
+    <div class="power-led" [class.active]="isPlaying"></div>
+  </div>
+
+  <!-- Metal platter -->
+  <div class="platter">
+    <div class="platter-ring"></div>
+
+    <!-- Vinyl disc -->
+    <div class="vinyl" [class.spinning]="isPlaying">
+      <div class="vinyl-grooves"></div>
+      <div class="vinyl-sheen"></div>
+      <div class="vinyl-reflection"></div>
+      <!-- Center label -->
+      <div class="vinyl-label">
+        @if (thumbUrl()) {
+          <img [src]="thumbUrl()" alt="" class="vinyl-art">
+        }
+        <div class="vinyl-label-ring"></div>
+        <div class="vinyl-spindle"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tonearm assembly -->
+  <div class="tonearm" [class.playing]="isPlaying">
+    <div class="tonearm-rest"></div>
+    <div class="tonearm-pivot"></div>
+    <div class="tonearm-counterweight"></div>
+    <div class="tonearm-arm"></div>
+    <div class="tonearm-head">
+      <div class="tonearm-cartridge"></div>
+    </div>
+  </div>
+</div>

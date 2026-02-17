@@ -1,0 +1,411 @@
+.turntable {
+  position: relative;
+  width: 380px;
+  height: 380px;
+  max-width: 85vw;
+  max-height: 85vw;
+}
+
+// ── AMBIENT GLOW ──
+
+.turntable-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 130%;
+  height: 130%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(
+    circle,
+    rgba(200, 152, 76, 0.1) 0%,
+    rgba(196, 75, 63, 0.05) 35%,
+    transparent 65%
+  );
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1s ease;
+  filter: blur(30px);
+
+  .turntable--playing & {
+    opacity: 1;
+    animation: warmGlow 4s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes warmGlow {
+  0% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+  100% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+}
+
+// ── WOODEN PLINTH ──
+
+.turntable-plinth {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  overflow: hidden;
+  background: linear-gradient(145deg, #251B14, #1A1310);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(200, 152, 76, 0.06),
+    inset 0 1px 0 rgba(200, 152, 76, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
+
+.plinth-grain {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      87deg,
+      transparent,
+      transparent 2px,
+      rgba(200, 150, 80, 0.013) 2px,
+      rgba(200, 150, 80, 0.013) 3px
+    ),
+    repeating-linear-gradient(
+      89deg,
+      transparent,
+      transparent 7px,
+      rgba(200, 150, 80, 0.022) 7px,
+      rgba(200, 150, 80, 0.022) 9px
+    ),
+    repeating-linear-gradient(
+      88deg,
+      transparent,
+      transparent 20px,
+      rgba(200, 150, 80, 0.016) 20px,
+      rgba(200, 150, 80, 0.016) 23px
+    ),
+    radial-gradient(ellipse at 25% 55%, rgba(200, 150, 80, 0.035) 0%, transparent 35%),
+    radial-gradient(ellipse at 75% 35%, rgba(200, 150, 80, 0.025) 0%, transparent 30%);
+  pointer-events: none;
+}
+
+.plinth-edge {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  border: 1px solid rgba(200, 152, 76, 0.08);
+  background: linear-gradient(
+    to bottom,
+    rgba(200, 152, 76, 0.04) 0%,
+    transparent 3%,
+    transparent 97%,
+    rgba(0, 0, 0, 0.2) 100%
+  );
+  pointer-events: none;
+}
+
+.power-led {
+  position: absolute;
+  bottom: 16px;
+  left: 24px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #2A2420;
+  transition: all 0.8s ease;
+  z-index: 3;
+
+  &.active {
+    background: #7CCD5F;
+    box-shadow: 0 0 4px #7CCD5F, 0 0 12px rgba(124, 205, 95, 0.3);
+  }
+}
+
+// ── PLATTER ──
+
+.platter {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  max-width: 74vw;
+  max-height: 74vw;
+  top: 48%;
+  left: 44%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: linear-gradient(160deg, #2A2520 0%, #1E1A16 50%, #2A2520 100%);
+  box-shadow:
+    0 0 0 1px rgba(200, 152, 76, 0.05),
+    0 2px 12px rgba(0, 0, 0, 0.4),
+    inset 0 0 20px rgba(0, 0, 0, 0.2);
+}
+
+.platter-ring {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  border: 1px solid rgba(200, 152, 76, 0.04);
+  pointer-events: none;
+}
+
+// ── VINYL ──
+
+.vinyl {
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: #0A0A0A;
+  box-shadow:
+    0 0 30px rgba(0, 0, 0, 0.5),
+    inset 0 0 60px rgba(0, 0, 0, 0.4);
+
+  &.spinning {
+    animation: vinylSpin 1.8s linear infinite;
+  }
+}
+
+@keyframes vinylSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.vinyl-grooves {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-radial-gradient(
+    circle at center,
+    transparent 0px,
+    transparent 1px,
+    rgba(255, 255, 255, 0.018) 1.5px,
+    transparent 2px,
+    transparent 3.5px
+  );
+  mask-image: radial-gradient(
+    circle,
+    transparent 30px,
+    black 32px,
+    black calc(100% - 4px),
+    transparent 100%
+  );
+  -webkit-mask-image: radial-gradient(
+    circle,
+    transparent 30px,
+    black 32px,
+    black calc(100% - 4px),
+    transparent 100%
+  );
+}
+
+// Rainbow light refraction
+.vinyl-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 30deg,
+    transparent 0deg,
+    rgba(220, 60, 60, 0.03) 25deg,
+    rgba(220, 170, 50, 0.025) 55deg,
+    rgba(60, 200, 90, 0.03) 85deg,
+    rgba(60, 110, 220, 0.03) 115deg,
+    rgba(140, 60, 200, 0.025) 145deg,
+    transparent 175deg,
+    rgba(220, 60, 60, 0.025) 205deg,
+    rgba(60, 200, 90, 0.025) 245deg,
+    transparent 280deg,
+    rgba(60, 110, 220, 0.025) 310deg,
+    transparent 340deg
+  );
+  mask-image: radial-gradient(
+    circle,
+    transparent 30px,
+    black 35px,
+    black calc(100% - 4px),
+    transparent 100%
+  );
+  -webkit-mask-image: radial-gradient(
+    circle,
+    transparent 30px,
+    black 35px,
+    black calc(100% - 4px),
+    transparent 100%
+  );
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.vinyl-reflection {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    transparent 28%,
+    rgba(255, 255, 255, 0.03) 40%,
+    rgba(255, 255, 255, 0.06) 45%,
+    rgba(255, 255, 255, 0.03) 50%,
+    transparent 62%
+  );
+  pointer-events: none;
+}
+
+// Center label
+.vinyl-label {
+  position: absolute;
+  width: 86px;
+  height: 86px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #C44B3F, #982F27, #C8984C);
+  overflow: hidden;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.vinyl-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vinyl-label-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(0, 0, 0, 0.15) 0%,
+    transparent 45%,
+    rgba(0, 0, 0, 0.25) 100%
+  );
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+
+.vinyl-spindle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #555, #333);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(200, 152, 76, 0.1);
+}
+
+// ── TONEARM ──
+
+.tonearm {
+  position: absolute;
+  top: 12%;
+  right: 10%;
+  width: 8px;
+  height: 155px;
+  transform-origin: top center;
+  transform: rotate(32deg);
+  transition: transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  z-index: 5;
+
+  &.playing {
+    transform: rotate(2deg);
+  }
+}
+
+.tonearm-rest {
+  position: absolute;
+  top: 112px;
+  right: -22px;
+  width: 4px;
+  height: 22px;
+  border-radius: 2px;
+  background: linear-gradient(to bottom, #5D4F44, #3D3530);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  opacity: 0.5;
+}
+
+.tonearm-pivot {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(145deg, #6B5D50, #3D3530);
+  border-radius: 50%;
+  box-shadow:
+    0 3px 10px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(200, 152, 76, 0.15);
+  z-index: 2;
+}
+
+.tonearm-counterweight {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #8A7A6C, #5D4F44);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.tonearm-arm {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 130px;
+  background: linear-gradient(
+    to bottom,
+    #B8A89A,
+    #8A7A6C 40%,
+    #B8A89A 50%,
+    #8A7A6C
+  );
+  border-radius: 2px;
+  box-shadow: 1px 0 6px rgba(0, 0, 0, 0.3);
+}
+
+.tonearm-head {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-28deg);
+  width: 16px;
+  height: 22px;
+  background: linear-gradient(to bottom, #B8A89A, #6B5D50);
+  border-radius: 2px 2px 4px 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.tonearm-cartridge {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 6px;
+  background: linear-gradient(to bottom, #C8984C, #E6B86A);
+  border-radius: 0 0 1px 1px;
+  box-shadow: 0 0 4px rgba(200, 152, 76, 0.3);
+}
+
+// ── RESPONSIVE ──
+
+@media (max-width: 768px) {
+  .turntable {
+    width: 300px;
+    height: 300px;
+  }
+
+  .platter {
+    width: 225px;
+    height: 225px;
+  }
+
+  .vinyl-label {
+    width: 70px;
+    height: 70px;
+  }
+}
