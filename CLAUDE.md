@@ -17,6 +17,8 @@ Aplicacion web de reproductor de musica estilo vinyl/tocadiscos con integracion 
 - `npm run build` — Build de produccion
 - `npm run tunnel` — Tunel ngrok para compartir sesiones Jam (requiere NGROK_AUTHTOKEN en .env)
 - `npm run cy:open` / `npm run cy:run` — Cypress E2E tests
+- `docker compose up --build` — Build y levantar con Docker (puerto 3001)
+- `docker compose up --build -d` — Igual pero en background
 
 ## Configuracion de Entorno
 - Archivo `.env` en la raiz del proyecto (NO se sube a git):
@@ -66,6 +68,9 @@ server/
 └── tunnel.js                # ngrok tunnel script (usa @ngrok/ngrok)
 
 .env                         # Variables de entorno (NGROK_AUTHTOKEN) — NO en git
+Dockerfile                   # Multi-stage build (Angular + Node.js)
+.dockerignore                # Exclusiones para Docker build context
+docker-compose.yml           # Orquestacion con Docker Compose
 ```
 
 ## Patrones y Convenciones
@@ -114,6 +119,13 @@ server/
 - Servido desde proxy (puerto 3001): usa `''` (mismo origen)
 - Remoto (ngrok/tunnel): usa `''` (mismo origen)
 - Override manual via query param `?proxy=URL`
+
+## Docker
+- **Dockerfile**: Multi-stage build — Stage 1 compila Angular con `npm run build`, Stage 2 copia solo dependencias de produccion + servidor + build compilado
+- **Imagen base**: `node:22-alpine`
+- **Puerto**: 3001 (mismo que el servidor Express)
+- **docker-compose.yml**: Mapea puerto 3001, carga `.env` automaticamente, restart `unless-stopped`
+- `.dockerignore` excluye `node_modules`, `dist`, `.git`, `.env`, `cypress`, etc.
 
 ## Notas
 - No hay tests unitarios (skipTests: true en schematics)

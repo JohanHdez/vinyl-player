@@ -20,6 +20,7 @@ Reproductor de musica web con estetica de tocadiscos vintage. Busca y reproduce 
 - Node.js 20+
 - npm 10+
 - Cuenta de [ngrok](https://ngrok.com) (gratis, para sesiones Jam remotas)
+- Docker (opcional, para despliegue con contenedor)
 
 ## Instalacion
 
@@ -68,6 +69,24 @@ npm run tunnel
 
 Comparte la URL de ngrok con los participantes.
 
+### Docker
+
+```bash
+# Build y levantar
+docker compose up --build
+
+# En background
+docker compose up --build -d
+
+# Solo build de la imagen
+docker build -t vinyl-player .
+
+# Correr manualmente
+docker run -p 3001:3001 vinyl-player
+```
+
+Abre http://localhost:3001
+
 ## Stack
 
 | Capa | Tecnologia |
@@ -101,6 +120,10 @@ src/app/
 server/
 ├── proxy.js    # Express + Socket.IO + YouTube proxy
 └── tunnel.js   # Script de ngrok
+
+Dockerfile           # Multi-stage build (Angular + Node.js)
+.dockerignore        # Exclusiones para Docker build
+docker-compose.yml   # Orquestacion con Docker Compose
 ```
 
 ## Scripts

@@ -1,0 +1,15 @@
+node_modules
+dist
+.angular
+.git
+.vscode
+.idea
+.claude
+.env
+*.log
+npm-debug.log
+yarn-error.log
+Thumbs.db
+.DS_Store
+cypress
+__screenshots__
