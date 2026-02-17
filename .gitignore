@@ -43,5 +43,8 @@ __screenshots__/
 .DS_Store
 Thumbs.db
 
+# Environment variables
+.env
+
 # Claude Code
 .claude/

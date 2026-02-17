@@ -49,6 +49,16 @@ export class App implements OnInit, OnDestroy {
   // View management
   currentView = signal<AppView>('home');
   sidebarCollapsed = signal(false);
+  mobileMenuOpen = signal(false);
+
+  // Top progress bar
+  currentTime = signal(0);
+  duration = signal(0);
+  barProgress = computed(() =>
+    this.duration() > 0 ? (this.currentTime() / this.duration()) * 100 : 0
+  );
+  barHoverPercent = signal(-1);
+  barHoverTime = signal('');
 
   currentThumb = computed(() => {
     const song = this.currentSong();
@@ -75,7 +85,9 @@ export class App implements OnInit, OnDestroy {
       this.state.currentSong$.subscribe(s => {
         this.currentSong.set(s);
       }),
-      this.state.toast$.subscribe(msg => this.showToast(msg))
+      this.state.toast$.subscribe(msg => this.showToast(msg)),
+      this.state.currentTime$.subscribe(t => this.currentTime.set(t)),
+      this.state.duration$.subscribe(d => this.duration.set(d))
     );
     this.loadInitialContent();
     this.jamService.checkUrlForJam();
@@ -88,6 +100,7 @@ export class App implements OnInit, OnDestroy {
 
   setView(view: AppView): void {
     this.currentView.set(view);
+    this.mobileMenuOpen.set(false);
   }
 
   toggleSidebar(): void {
@@ -165,6 +178,31 @@ export class App implements OnInit, OnDestroy {
     }
     if (event.code === 'ArrowRight') this.state.playNext();
     if (event.code === 'ArrowLeft') this.state.playPrev();
+  }
+
+  onBarProgressClick(event: MouseEvent): void {
+    if (this.jamService.isInSession() && !this.jamService.isHost()) return;
+    const bar = event.currentTarget as HTMLElement;
+    const rect = bar.getBoundingClientRect();
+    const pct = (event.clientX - rect.left) / rect.width;
+    if (this.duration() > 0) {
+      const seekTime = pct * this.duration();
+      this.yt.seekTo(seekTime);
+      if (this.state.onSeeked) this.state.onSeeked(seekTime);
+    }
+  }
+
+  onBarProgressHover(event: MouseEvent): void {
+    const bar = event.currentTarget as HTMLElement;
+    const rect = bar.getBoundingClientRect();
+    const pct = ((event.clientX - rect.left) / rect.width) * 100;
+    this.barHoverPercent.set(Math.max(0, Math.min(100, pct)));
+    if (this.duration() > 0) {
+      const time = (pct / 100) * this.duration();
+      const m = Math.floor(time / 60);
+      const s = Math.floor(time % 60);
+      this.barHoverTime.set(`${m}:${s.toString().padStart(2, '0')}`);
+    }
   }
 
   private togglePlay(): void {

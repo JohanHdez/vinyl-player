@@ -15,6 +15,7 @@ export class JamService {
 
   isInSession = signal(false);
   isHost = signal(false);
+  listenLocally = signal(true);
   sessionId = signal('');
   sessionCode = signal('');
   participants = signal<JamParticipant[]>([]);
@@ -56,13 +57,28 @@ export class JamService {
   }
 
   createSession(): void {
+    this.listenLocally.set(true);
     this.connect();
-    this.socket!.emit('create-session', { name: 'Host' });
+    // Send current playlist state so guests can sync
+    const playlist = this.state.playlist$.value;
+    const currentIndex = this.state.currentIndex;
+    const currentTime = this.yt.getCurrentTime();
+    const duration = this.yt.getDuration();
+    const isPlaying = this.state.isPlaying$.value;
+    this.socket!.emit('create-session', {
+      name: 'Host',
+      playlist,
+      currentIndex,
+      currentTime,
+      duration,
+      isPlaying,
+    });
   }
 
-  joinSession(code: string, name: string): void {
+  joinSession(code: string, name: string, listenLocally: boolean = true): void {
+    this.listenLocally.set(listenLocally);
     this.connect();
-    this.socket!.emit('join-session', { code, name });
+    this.socket!.emit('join-session', { code, name, listenLocally });
   }
 
   leaveSession(): void {
@@ -74,19 +90,47 @@ export class JamService {
     }
     this.isInSession.set(false);
     this.isHost.set(false);
+    this.listenLocally.set(true);
     this.sessionId.set('');
     this.sessionCode.set('');
     this.participants.set([]);
     localStorage.removeItem('vinyl_jam_code');
     localStorage.removeItem('vinyl_jam_name');
+    localStorage.removeItem('vinyl_jam_listen');
   }
 
   attemptRejoin(): void {
     const code = localStorage.getItem('vinyl_jam_code');
     const name = localStorage.getItem('vinyl_jam_name');
     if (!code || !name) return;
+    const listen = localStorage.getItem('vinyl_jam_listen') !== 'false';
+    this.listenLocally.set(listen);
     this.connect();
-    this.socket!.emit('rejoin-session', { code, name });
+    this.socket!.emit('rejoin-session', { code, name, listenLocally: listen });
+  }
+
+  switchListenMode(listenLocally: boolean): void {
+    this.listenLocally.set(listenLocally);
+    localStorage.setItem('vinyl_jam_listen', String(listenLocally));
+    if (this.socket && this.isInSession()) {
+      this.socket.emit('update-listen-mode', { listenLocally });
+    }
+    // If switching to local: start playing the current song via YouTube
+    if (listenLocally && this.state.currentIndex >= 0) {
+      const playlist = this.state.playlist$.value;
+      const song = playlist[this.state.currentIndex];
+      if (song) {
+        this.yt.loadVideoThen(song.videoId, () => {
+          const ct = this.state.currentTime$.value;
+          if (ct > 0) this.yt.seekTo(ct);
+          if (!this.state.isPlaying$.value) this.yt.pause();
+        });
+      }
+    }
+    // If switching to remote: stop local YouTube playback
+    if (!listenLocally) {
+      this.yt.pause();
+    }
   }
 
   emitPause(currentTime: number): void {
@@ -120,7 +164,7 @@ export class JamService {
   }
 
   private emitPlaySong(index: number): void {
-    if (this.socket && this.isInSession() && this.isHost()) {
+    if (this.socket && this.isInSession()) {
       this.socket.emit('play-song', { index });
     }
   }
@@ -131,8 +175,9 @@ export class JamService {
     this.syncInterval = setInterval(() => {
       if (this.socket && this.isInSession() && this.isHost()) {
         const currentTime = this.yt.getCurrentTime();
+        const duration = this.yt.getDuration();
         const isPlaying = this.state.isPlaying$.value;
-        this.socket.emit('sync-playback', { currentTime, isPlaying });
+        this.socket.emit('sync-playback', { currentTime, duration, isPlaying });
       }
     }, 5000);
   }
@@ -142,6 +187,11 @@ export class JamService {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
     }
+  }
+
+  /** Whether this client should control YouTube playback */
+  private get shouldPlayLocally(): boolean {
+    return this.listenLocally() || this.isHost();
   }
 
   private connect(): void {
@@ -158,6 +208,7 @@ export class JamService {
       this.isInSession.set(true);
       localStorage.setItem('vinyl_jam_code', data.code);
       localStorage.setItem('vinyl_jam_name', 'Host');
+      localStorage.setItem('vinyl_jam_listen', 'true');
       this.startSyncInterval();
     });
 
@@ -169,6 +220,7 @@ export class JamService {
       this.joinDialogOpen.set(false);
       if (data.isHost) {
         this.isHost.set(true);
+        this.listenLocally.set(true);
         this.startSyncInterval();
       }
       const storedName = localStorage.getItem('vinyl_jam_name');
@@ -177,6 +229,7 @@ export class JamService {
         localStorage.setItem('vinyl_jam_name', me?.name || 'Invitado');
       }
       localStorage.setItem('vinyl_jam_code', data.code);
+      localStorage.setItem('vinyl_jam_listen', String(this.listenLocally()));
     });
 
     this.socket.on('participant-joined', (data: { participants: JamParticipant[] }) => {
@@ -185,6 +238,10 @@ export class JamService {
     });
 
     this.socket.on('participant-left', (data: { participants: JamParticipant[] }) => {
+      this.participants.set(data.participants);
+    });
+
+    this.socket.on('participant-updated', (data: { participants: JamParticipant[] }) => {
       this.participants.set(data.participants);
     });
 
@@ -207,61 +264,103 @@ export class JamService {
 
     this.socket.on('song-played', (data: { index: number }) => {
       this.suppressEmit = true;
-      this.state.play(data.index);
+      if (this.shouldPlayLocally) {
+        this.state.play(data.index);
+      } else {
+        this.state.setCurrentSongDisplay(data.index);
+        this.state.setPlaying(true);
+      }
       this.suppressEmit = false;
     });
 
     this.socket.on('song-paused', (data: { currentTime: number }) => {
       this.suppressEmit = true;
-      this.yt.seekTo(data.currentTime);
-      this.yt.pause();
+      if (this.shouldPlayLocally) {
+        this.yt.seekTo(data.currentTime);
+        this.yt.pause();
+      } else {
+        this.state.updateTime(data.currentTime, this.state.duration$.value);
+        this.state.setPlaying(false);
+      }
       this.suppressEmit = false;
     });
 
     this.socket.on('song-resumed', (data: { currentTime: number }) => {
       this.suppressEmit = true;
-      this.yt.seekTo(data.currentTime);
-      this.yt.play();
+      if (this.shouldPlayLocally) {
+        this.yt.seekTo(data.currentTime);
+        this.yt.play();
+      } else {
+        this.state.updateTime(data.currentTime, this.state.duration$.value);
+        this.state.setPlaying(true);
+      }
       this.suppressEmit = false;
     });
 
     this.socket.on('song-seeked', (data: { currentTime: number }) => {
       this.suppressEmit = true;
-      this.yt.seekTo(data.currentTime);
+      if (this.shouldPlayLocally) {
+        this.yt.seekTo(data.currentTime);
+      } else {
+        this.state.updateTime(data.currentTime, this.state.duration$.value);
+      }
       this.suppressEmit = false;
     });
 
-    this.socket.on('playback-synced', (data: { currentTime: number; isPlaying: boolean }) => {
-      // Only correct if drift > 2 seconds
-      const localTime = this.yt.getCurrentTime();
-      const drift = Math.abs(localTime - data.currentTime);
-      if (drift > 2) {
-        this.yt.seekTo(data.currentTime);
-      }
-      const localPlaying = this.state.isPlaying$.value;
-      if (data.isPlaying && !localPlaying) {
-        this.yt.play();
-      } else if (!data.isPlaying && localPlaying) {
-        this.yt.pause();
+    this.socket.on('playback-synced', (data: { currentTime: number; duration?: number; isPlaying: boolean }) => {
+      if (this.shouldPlayLocally) {
+        // Only correct if drift > 2 seconds
+        const localTime = this.yt.getCurrentTime();
+        const drift = Math.abs(localTime - data.currentTime);
+        if (drift > 2) {
+          this.yt.seekTo(data.currentTime);
+        }
+        const localPlaying = this.state.isPlaying$.value;
+        if (data.isPlaying && !localPlaying) {
+          this.yt.play();
+        } else if (!data.isPlaying && localPlaying) {
+          this.yt.pause();
+        }
+      } else {
+        // Remote listening: update display only
+        const duration = data.duration || this.state.duration$.value;
+        this.state.updateTime(data.currentTime, duration);
+        this.state.setPlaying(data.isPlaying);
       }
     });
 
-    this.socket.on('sync-state', (data: { playlist: Song[]; currentIndex: number; isPlaying?: boolean; currentTime?: number }) => {
+    this.socket.on('sync-state', (data: { playlist: Song[]; currentIndex: number; isPlaying?: boolean; currentTime?: number; duration?: number }) => {
       this.suppressEmit = true;
+      this.state.suppressToast = true;
       for (const song of data.playlist) {
         this.state.addToPlaylist(song);
       }
+      this.state.suppressToast = false;
       if (data.currentIndex >= 0) {
-        this.state.play(data.currentIndex);
-        // Delay seek/pause to allow video to load
-        setTimeout(() => {
-          if (data.currentTime && data.currentTime > 0) {
-            this.yt.seekTo(data.currentTime);
+        if (this.shouldPlayLocally) {
+          // Use the current song's videoId to load directly with callback
+          const playlist = this.state.playlist$.value;
+          const song = playlist[data.currentIndex];
+          if (song) {
+            this.state.setCurrentSongDisplay(data.currentIndex);
+            this.yt.loadVideoThen(song.videoId, () => {
+              if (data.currentTime && data.currentTime > 0) {
+                this.yt.seekTo(data.currentTime);
+              }
+              if (data.isPlaying === false) {
+                this.yt.pause();
+              }
+            });
           }
-          if (data.isPlaying === false) {
-            this.yt.pause();
+        } else {
+          // Remote listening: show song info without YouTube
+          this.state.setCurrentSongDisplay(data.currentIndex);
+          if (data.currentTime) {
+            const duration = data.duration || 0;
+            this.state.updateTime(data.currentTime, duration);
           }
-        }, 1500);
+          this.state.setPlaying(data.isPlaying ?? false);
+        }
       }
       this.suppressEmit = false;
     });
@@ -269,6 +368,7 @@ export class JamService {
     this.socket.on('session-expired', () => {
       localStorage.removeItem('vinyl_jam_code');
       localStorage.removeItem('vinyl_jam_name');
+      localStorage.removeItem('vinyl_jam_listen');
       this.state.toast$.next('La sesion Jam ha expirado');
     });
 

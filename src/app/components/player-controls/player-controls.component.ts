@@ -32,7 +32,7 @@ export class PlayerControlsComponent implements OnInit, OnDestroy {
   });
 
   controlsDisabled = computed(() =>
-    this.jam.isInSession() && !this.jam.isHost()
+    this.jam.isInSession() && !this.jam.isHost() && !this.jam.listenLocally()
   );
 
   hoverPercent = signal(0);

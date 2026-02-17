@@ -13,6 +13,7 @@ import { JamService } from '../../services/jam.service';
 export class JamJoinComponent {
   code = '';
   name = '';
+  listenLocally = true;
 
   constructor(public jam: JamService) {}
 
@@ -32,7 +33,7 @@ export class JamJoinComponent {
     const c = this.code.trim();
     const n = this.name.trim() || 'Invitado';
     if (!c) return;
-    this.jam.joinSession(c, n);
+    this.jam.joinSession(c, n, this.listenLocally);
   }
 
   close(): void {

@@ -298,8 +298,7 @@
 
 @media (max-width: 768px) {
   .bar-layout {
-    flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
   }
 
   .bar-thumb {
@@ -309,16 +308,11 @@
 
   .bar-info {
     flex: 1 1 0;
-    min-width: 80px;
-  }
-
-  .bar-controls {
-    order: 0;
+    min-width: 60px;
   }
 
   .bar-progress {
-    flex: 1 1 100%;
-    order: 1;
+    display: none;
   }
 
   .bar-volume {
@@ -338,5 +332,36 @@
       width: 18px;
       height: 18px;
     }
+  }
+}
+
+@media (max-width: 480px) {
+  .bar-layout {
+    gap: 6px;
+  }
+
+  .bar-info {
+    flex: 1 1 0;
+    min-width: 40px;
+
+    .song-title {
+      font-size: 0.78rem;
+    }
+    .song-artist {
+      font-size: 0.65rem;
+    }
+  }
+
+  .bar-controls {
+    gap: 4px;
+  }
+
+  .ctrl-btn {
+    padding: 2px;
+  }
+
+  .play-btn {
+    width: 34px;
+    height: 34px;
   }
 }

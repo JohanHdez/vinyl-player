@@ -1,59 +1,118 @@
-# VinylPlayer
+# Vinyl Player
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.1.3.
+Reproductor de musica web con estetica de tocadiscos vintage. Busca y reproduce musica de YouTube con un tocadiscos animado, controles de reproduccion y sesiones colaborativas en tiempo real.
 
-## Development server
+## Caracteristicas
 
-To start a local development server, run:
+- **Tocadiscos animado** — Vinilo giratorio con refraccion de luz, brazo con aguja, plinto de madera con textura de grano
+- **Busqueda de YouTube** — Busca canciones o pega URLs de YouTube directamente
+- **Playlist** — Cola de reproduccion con barras de ecualizador animadas
+- **Tendencias** — Grid de canciones en tendencia desde YouTube Music
+- **Jam Sessions** — Sesiones colaborativas en tiempo real:
+  - Crea una sesion y comparte el codigo QR
+  - Los invitados escanean el QR o ingresan el codigo
+  - Elige escuchar en tu dispositivo o en el del host
+  - Playlist sincronizada entre todos los participantes
+  - Reconexion automatica con grace period de 5 minutos
 
-```bash
-ng serve
-```
+## Requisitos
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+- Node.js 20+
+- npm 10+
+- Cuenta de [ngrok](https://ngrok.com) (gratis, para sesiones Jam remotas)
 
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
+## Instalacion
 
 ```bash
-ng build
+git clone https://github.com/JohanHdez/vinyl-player.git
+cd vinyl-player
+npm install
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+## Configuracion
 
-## Running unit tests
+Crea un archivo `.env` en la raiz del proyecto:
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+```env
+NGROK_AUTHTOKEN=tu_token_de_ngrok
+```
+
+Obtiene tu token en: https://dashboard.ngrok.com/get-started/your-authtoken
+
+## Uso
+
+### Desarrollo local
 
 ```bash
-ng test
+# Terminal 1: Servidor proxy (YouTube API + Socket.IO)
+npm run proxy
+
+# Terminal 2: Angular dev server
+npm start
 ```
 
-## Running end-to-end tests
+Abre http://localhost:4200
 
-For end-to-end (e2e) testing, run:
+### Acceso remoto (Jam Sessions entre dispositivos)
 
 ```bash
-ng e2e
+# 1. Compilar Angular
+npm run build
+
+# 2. Levantar servidor (sirve la app + API + WebSocket)
+npm run proxy
+
+# 3. Crear tunnel (en otra terminal)
+npm run tunnel
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+Comparte la URL de ngrok con los participantes.
 
-## Additional Resources
+## Stack
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+| Capa | Tecnologia |
+|------|-----------|
+| Frontend | Angular 21, TypeScript 5.9, SCSS |
+| Backend | Express 5, Socket.IO |
+| Audio | YouTube IFrame API |
+| Tunnel | ngrok |
+| Fonts | Young Serif, Syne (Google Fonts) |
+
+## Estructura
+
+```
+src/app/
+├── components/
+│   ├── turntable/        # Tocadiscos CSS animado
+│   ├── player-controls/  # Play/pause, progreso, volumen
+│   ├── search-bar/       # Busqueda de canciones
+│   ├── search-results/   # Resultados de busqueda
+│   ├── playlist/         # Cola de reproduccion
+│   ├── trending-grid/    # Tendencias de YouTube
+│   ├── jam-panel/        # Panel de sesion Jam (QR, participantes)
+│   └── jam-join/         # Dialog para unirse a Jam
+├── services/
+│   ├── youtube.service.ts       # YouTube API
+│   ├── player-state.service.ts  # Estado global
+│   ├── jam.service.ts           # Socket.IO / Jam
+│   └── proxy-url.ts             # URL del proxy
+└── models/
+
+server/
+├── proxy.js    # Express + Socket.IO + YouTube proxy
+└── tunnel.js   # Script de ngrok
+```
+
+## Scripts
+
+| Comando | Descripcion |
+|---------|------------|
+| `npm start` | Dev server Angular (puerto 4200) |
+| `npm run proxy` | Servidor Express + Socket.IO (puerto 3001) |
+| `npm run build` | Build de produccion |
+| `npm run tunnel` | Tunnel ngrok para acceso remoto |
+| `npm run cy:open` | Abrir Cypress para tests E2E |
+
+## Licencia
+
+MIT

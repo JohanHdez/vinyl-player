@@ -42,10 +42,30 @@
           @if (p.isHost) {
             <span class="host-badge">Host</span>
           }
+          @if (!p.isHost && p.listenLocally === false) {
+            <span class="remote-badge">Remoto</span>
+          }
         </div>
       }
     </div>
   </div>
+
+  <!-- Listen mode toggle (guests only) -->
+  @if (!isHost()) {
+    <div class="listen-mode-section">
+      <div class="listen-mode-label">Escuchando en:</div>
+      <div class="listen-mode-toggle">
+        <button class="listen-mode-btn" [class.active]="listenLocally()" (click)="setListenMode(true)">
+          <svg viewBox="0 0 24 24"><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/></svg>
+          Mi dispositivo
+        </button>
+        <button class="listen-mode-btn" [class.active]="!listenLocally()" (click)="setListenMode(false)">
+          <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14z"/></svg>
+          En el host
+        </button>
+      </div>
+    </div>
+  }
 
   <button class="leave-btn" (click)="leaveSession()">Dejar sesion</button>
 </div>

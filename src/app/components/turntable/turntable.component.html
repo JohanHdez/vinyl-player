@@ -12,9 +12,11 @@
   <!-- Metal platter -->
   <div class="platter">
     <div class="platter-ring"></div>
+    <div class="platter-dots"></div>
 
     <!-- Vinyl disc -->
     <div class="vinyl" [class.spinning]="isPlaying">
+      <div class="vinyl-outer-rim"></div>
       <div class="vinyl-grooves"></div>
       <div class="vinyl-sheen"></div>
       <div class="vinyl-reflection"></div>
@@ -22,21 +24,26 @@
       <div class="vinyl-label">
         @if (thumbUrl()) {
           <img [src]="thumbUrl()" alt="" class="vinyl-art">
+        } @else {
+          <div class="vinyl-label-default"></div>
         }
-        <div class="vinyl-label-ring"></div>
+        <div class="vinyl-label-overlay"></div>
         <div class="vinyl-spindle"></div>
       </div>
     </div>
   </div>
 
   <!-- Tonearm assembly -->
-  <div class="tonearm" [class.playing]="isPlaying">
-    <div class="tonearm-rest"></div>
+  <div class="tonearm-assembly" [class.playing]="isPlaying">
+    <div class="tonearm-base"></div>
     <div class="tonearm-pivot"></div>
-    <div class="tonearm-counterweight"></div>
-    <div class="tonearm-arm"></div>
-    <div class="tonearm-head">
-      <div class="tonearm-cartridge"></div>
+    <div class="tonearm-arm-wrapper">
+      <div class="tonearm-counterweight"></div>
+      <div class="tonearm-arm"></div>
+      <div class="tonearm-head">
+        <div class="tonearm-cartridge"></div>
+        <div class="tonearm-stylus"></div>
+      </div>
     </div>
   </div>
 </div>

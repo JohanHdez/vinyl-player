@@ -10,6 +10,10 @@ export class YouTubeService {
   private player: any = null;
   private playerReady = false;
   private progressInterval: any = null;
+  private pendingVideoId: string | null = null;
+
+  /** Callback fired once after next video starts playing */
+  private onVideoStarted: (() => void) | null = null;
 
   private readonly PROXY_URL = PROXY_URL;
 
@@ -58,6 +62,13 @@ export class YouTubeService {
           this.ngZone.run(() => {
             this.playerReady = true;
             this.player.setVolume(this.state.volume$.value);
+            // Play any video that was queued before player was ready
+            if (this.pendingVideoId) {
+              const vid = this.pendingVideoId;
+              this.pendingVideoId = null;
+              // Preserve any pending callback
+              this.player.loadVideoById(vid);
+            }
           });
         },
         onStateChange: (e: any) => this.ngZone.run(() => this.onStateChange(e)),
@@ -78,6 +89,11 @@ export class YouTubeService {
     if (e.data === YT.PlayerState.PLAYING) {
       this.state.setPlaying(true);
       this.startProgressUpdate();
+      if (this.onVideoStarted) {
+        const cb = this.onVideoStarted;
+        this.onVideoStarted = null;
+        cb();
+      }
     }
     if (e.data === YT.PlayerState.PAUSED) {
       this.state.setPlaying(false);
@@ -92,10 +108,17 @@ export class YouTubeService {
 
   loadVideo(videoId: string): void {
     if (!this.playerReady) {
+      this.pendingVideoId = videoId;
       this.state.toast$.next('Cargando reproductor...');
       return;
     }
     this.player.loadVideoById(videoId);
+  }
+
+  /** Load a video and execute callback once it actually starts playing */
+  loadVideoThen(videoId: string, callback: () => void): void {
+    this.onVideoStarted = callback;
+    this.loadVideo(videoId);
   }
 
   play(): void {

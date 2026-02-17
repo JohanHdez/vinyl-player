@@ -21,6 +21,7 @@ export class PlayerStateService {
   readonly toast$ = new Subject<string>();
 
   // Jam integration hooks - set by JamService
+  suppressToast = false;
   onSongAdded: ((song: Song) => void) | null = null;
   onSongRemoved: ((index: number) => void) | null = null;
   onSongPlayed: ((index: number) => void) | null = null;
@@ -38,12 +39,12 @@ export class PlayerStateService {
 
   addToPlaylist(song: Song): boolean {
     if (this.playlist.some(s => s.videoId === song.videoId)) {
-      this.toast$.next('Ya esta en la lista');
+      if (!this.suppressToast) this.toast$.next('Ya esta en la lista');
       return false;
     }
     this.playlist.push(song);
     this.playlist$.next([...this.playlist]);
-    this.toast$.next('Agregada a la lista');
+    if (!this.suppressToast) this.toast$.next('Agregada a la lista');
     if (this.onSongAdded) this.onSongAdded(song);
     return true;
   }
@@ -75,6 +76,15 @@ export class PlayerStateService {
     this.currentSong$.next(song);
     this.playSong$.next(song);
     if (this.onSongPlayed) this.onSongPlayed(index);
+  }
+
+  /** Update display state without triggering YouTube playback */
+  setCurrentSongDisplay(index: number): void {
+    if (index < 0 || index >= this.playlist.length) return;
+    this._currentIndex = index;
+    const song = this.playlist[index];
+    this.currentIndex$.next(index);
+    this.currentSong$.next(song);
   }
 
   playNext(): void {

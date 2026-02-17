@@ -1,4 +1,12 @@
-<div class="app-shell" [class.sidebar-collapsed]="sidebarCollapsed()" [class.has-player]="hasSong()">
+<div class="app-shell" [class.sidebar-collapsed]="sidebarCollapsed()" [class.has-player]="hasSong()" [class.mobile-menu-open]="mobileMenuOpen()">
+
+  <!-- ═══ MOBILE HAMBURGER ═══ -->
+  <button class="mobile-hamburger" (click)="mobileMenuOpen.set(true)">
+    <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+  </button>
+
+  <!-- ═══ MOBILE OVERLAY ═══ -->
+  <div class="mobile-overlay" (click)="mobileMenuOpen.set(false)"></div>
 
   <!-- ═══ SIDEBAR ═══ -->
   <aside class="sidebar">
@@ -142,6 +150,17 @@
 <!-- ═══ BOTTOM PLAYER BAR ═══ -->
 @if (hasSong()) {
   <div class="bottom-bar">
+    <div class="bottom-bar-progress"
+         (click)="onBarProgressClick($event)"
+         (mousemove)="onBarProgressHover($event)"
+         (mouseleave)="barHoverPercent.set(-1)">
+      <div class="bottom-bar-progress-fill" [style.width.%]="barProgress()"></div>
+      @if (barHoverPercent() >= 0) {
+        <div class="bottom-bar-progress-hover" [style.left.%]="barHoverPercent()">
+          <span class="bottom-bar-progress-tooltip">{{ barHoverTime() }}</span>
+        </div>
+      }
+    </div>
     <app-player-controls></app-player-controls>
   </div>
 }

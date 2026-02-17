@@ -279,7 +279,7 @@ function generateCode() {
 io.on("connection", (socket) => {
   let currentSession = null;
 
-  socket.on("create-session", ({ name }) => {
+  socket.on("create-session", ({ name, playlist, currentIndex, currentTime, duration, isPlaying }) => {
     const code = generateCode();
     const sessionId = `jam_${code}`;
     const participant = { id: socket.id, name: name || "Host", isHost: true };
@@ -288,10 +288,11 @@ io.on("connection", (socket) => {
       code,
       hostId: socket.id,
       participants: [participant],
-      playlist: [],
-      currentIndex: -1,
-      isPlaying: false,
-      currentTime: 0,
+      playlist: Array.isArray(playlist) ? playlist : [],
+      currentIndex: typeof currentIndex === "number" ? currentIndex : -1,
+      isPlaying: !!isPlaying,
+      currentTime: currentTime || 0,
+      duration: duration || 0,
       lastUpdated: Date.now(),
     };
     sessions.set(code, session);
@@ -303,7 +304,7 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("join-session", ({ code, name }) => {
+  socket.on("join-session", ({ code, name, listenLocally }) => {
     const session = sessions.get(code);
     if (!session) {
       socket.emit("error", { message: "Sesion no encontrada" });
@@ -313,6 +314,7 @@ io.on("connection", (socket) => {
       id: socket.id,
       name: name || "Invitado",
       isHost: false,
+      listenLocally: listenLocally !== false,
     };
     session.participants.push(participant);
     currentSession = code;
@@ -332,6 +334,7 @@ io.on("connection", (socket) => {
       currentIndex: session.currentIndex,
       isPlaying: session.isPlaying,
       currentTime: estimatedTime,
+      duration: session.duration || 0,
     });
     io.to(session.sessionId).emit("participant-joined", {
       participants: session.participants,
@@ -359,8 +362,7 @@ io.on("connection", (socket) => {
     if (!currentSession) return;
     const session = sessions.get(currentSession);
     if (!session) return;
-    // Only host can control playback
-    if (session.hostId !== socket.id) return;
+    // Any participant can select which song to play
     session.currentIndex = index;
     session.isPlaying = true;
     session.currentTime = 0;
@@ -400,15 +402,29 @@ io.on("connection", (socket) => {
     socket.to(session.sessionId).emit("song-seeked", { currentTime });
   });
 
-  socket.on("sync-playback", ({ currentTime, isPlaying }) => {
+  socket.on("sync-playback", ({ currentTime, duration, isPlaying }) => {
     if (!currentSession) return;
     const session = sessions.get(currentSession);
     if (!session) return;
     if (session.hostId !== socket.id) return;
     session.currentTime = currentTime;
     session.isPlaying = isPlaying;
+    if (duration) session.duration = duration;
     session.lastUpdated = Date.now();
-    socket.to(session.sessionId).emit("playback-synced", { currentTime, isPlaying });
+    socket.to(session.sessionId).emit("playback-synced", { currentTime, duration: session.duration, isPlaying });
+  });
+
+  socket.on("update-listen-mode", ({ listenLocally }) => {
+    if (!currentSession) return;
+    const session = sessions.get(currentSession);
+    if (!session) return;
+    const participant = session.participants.find((p) => p.id === socket.id);
+    if (participant) {
+      participant.listenLocally = listenLocally;
+      io.to(session.sessionId).emit("participant-updated", {
+        participants: session.participants.filter((p) => !p.disconnectedAt),
+      });
+    }
   });
 
   socket.on("leave-session", () => {
@@ -469,6 +485,7 @@ io.on("connection", (socket) => {
       currentIndex: session.currentIndex,
       isPlaying: session.isPlaying,
       currentTime: estimatedTime,
+      duration: session.duration || 0,
     });
     io.to(session.sessionId).emit("participant-joined", {
       participants: session.participants.filter((p) => !p.disconnectedAt),
