@@ -19,6 +19,8 @@ const { orderQueue, toggleVote } = require("./queue-order");
 
 const ROOM_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const GUEST_GRACE_MS = 5 * 60 * 1000;
+/** Tiempo para que el anfitrión vuelva (p. ej. al recargar) sin que la sala lo note. */
+const HOST_GRACE_MS = 20 * 1000;
 const MAX_QUEUE = 300;
 
 /** @type {Map<string, any>} */
@@ -167,13 +169,25 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
       if (!me) return;
 
       if (me.isHost) {
-        // El anfitrión se va: la música se pausa y la sala espera su regreso.
         room.participants = room.participants.filter((p) => p !== me);
-        room.hostId = null;
-        room.isPlaying = false;
-        broadcastHost(room);
-        broadcastPeople(room, "participant-left");
-        systemMessage(room, graceful ? "El anfitrión se desconectó. La música vuelve cuando regrese." : `${me.name} cerró la sala por ahora. La música vuelve cuando regrese.`);
+        const goOffline = (text) => {
+          room.hostId = null;
+          room.isPlaying = false;
+          broadcastHost(room);
+          broadcastPeople(room, "participant-left");
+          systemMessage(room, text);
+        };
+        if (!graceful) {
+          goOffline(`${me.name} cerró la sala por ahora. La música vuelve cuando regrese.`);
+          return;
+        }
+        // Se cayó la conexión o recargó la página: se le dan unos segundos para volver
+        // sin avisar a nadie. Solo si no vuelve, la sala queda esperando.
+        const leftId = socket.id;
+        const timer = setTimeout(() => {
+          if (room.hostId === leftId) goOffline("El anfitrión se desconectó. La música vuelve cuando regrese.");
+        }, HOST_GRACE_MS);
+        timer.unref?.();
         return;
       }
 
@@ -237,11 +251,13 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
       const asHost = typeof hostKey === "string" && hostKey.length > 0 && hostKey === room.hostKey;
       if (asHost) {
         // Si había otra conexión del anfitrión (otra pestaña), la nueva toma el control.
+        const wasOffline = !room.hostId;
         room.participants = room.participants.filter((p) => !p.isHost);
         room.hostId = socket.id;
         enter(room, { id: socket.id, name: chat.cleanName(name, "Anfitrión"), isHost: true }, "session-joined");
         broadcastHost(room);
-        systemMessage(room, "El anfitrión volvió 🎶");
+        // Si volvió dentro del tiempo de gracia (una recarga), nadie se enteró: no hace falta avisar.
+        if (wasOffline) systemMessage(room, "El anfitrión volvió 🎶");
         return;
       }
 

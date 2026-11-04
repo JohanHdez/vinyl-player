@@ -272,3 +272,27 @@ test("compartir en el chat pone la canción en la cola, y los votos la adelantan
   assert.equal(q.playlist[1].votes.length, 2);
   assert.equal(sessions.get(code).currentIndex, 0);
 });
+
+test("si el anfitrión recarga la página, vuelve como anfitrión sin avisos en el chat", async () => {
+  const host = client();
+  host.emit("create-session", { name: "Johan", roomName: "Recarga" });
+  const { code, hostKey } = await once(host, "session-created");
+  const guest = client();
+  const seen = [];
+  guest.on("chat-message", (m) => seen.push(m.text));
+  let offline = false;
+  guest.on("host-status", (s) => { if (!s.online) offline = true; });
+  guest.emit("join-session", { code, name: "Ana" });
+  await once(guest, "session-joined");
+
+  host.close(); // recarga: se cae la conexión
+  await new Promise((r) => setTimeout(r, 300));
+  const again = client();
+  again.emit("rejoin-session", { code, name: "Johan", hostKey });
+  const snap = await once(again, "session-joined");
+  await new Promise((r) => setTimeout(r, 300));
+
+  assert.equal(snap.isHost, true);
+  assert.equal(offline, false, "los invitados no ven al anfitrión desconectado");
+  assert.ok(!seen.some((t) => /desconectó|volvió/.test(t)), "sin avisos de desconexión en el chat");
+});
