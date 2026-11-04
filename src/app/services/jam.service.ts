@@ -360,6 +360,7 @@ export class JamService {
     });
     socket.on('typing', (data: { id: string; name: string }) => this.markTyping(data.id, data.name));
     socket.on('chat-error', (data: { message: string }) => this.state.toast$.next(data.message));
+    socket.on('vote-error', (data: { message: string }) => this.state.toast$.next(data.message));
 
     // ── Cola ──
     // El servidor manda la cola completa ya ordenada por votos tras cada cambio.

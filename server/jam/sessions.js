@@ -288,7 +288,14 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
     socket.on("vote-song", ({ videoId } = {}) => {
       const room = current();
       const me = room && participantOf(room, socket.id);
-      if (me && toggleVote(room.playlist, room.currentIndex, videoId, me.id)) broadcastQueue(room);
+      if (!me) return;
+      if (toggleVote(room.playlist, room.currentIndex, videoId, me.id)) return broadcastQueue(room);
+      // Antes fallaba en silencio: ahora se explica por qué no se pudo votar.
+      const index = room.playlist.findIndex((s) => s.videoId === videoId);
+      const reason = index < 0 ? "Esa canción ya no está en la cola. Puedes volver a pedirla."
+        : index === room.currentIndex ? "Esa canción ya está sonando 🎶"
+        : "Esa canción ya sonó. Puedes volver a pedirla.";
+      socket.emit("vote-error", { videoId, message: reason });
     });
 
     socket.on("remove-song", ({ index } = {}) => {
@@ -313,7 +320,9 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
       const clean = chat.cleanSong(song);
       if (!isHostOf(room) || !clean || !Number.isInteger(index) || index < 0 || index >= room.playlist.length) return;
       const old = room.playlist[index];
-      room.playlist[index] = { ...old, ...clean };
+      // Recuerda qué versión reemplazó, para que la tarjeta del chat siga encontrándola.
+      const replacedFrom = [...new Set([...(old.replacedFrom ?? []), old.videoId])].slice(-5);
+      room.playlist[index] = { ...old, ...clean, replacedFrom };
       socket.to(room.sessionId).emit("song-replaced", { index, song: room.playlist[index] });
       broadcastQueue(room);
     });

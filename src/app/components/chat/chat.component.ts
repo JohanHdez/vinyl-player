@@ -3,7 +3,7 @@ import {
 } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { ChatMessage, REACTIONS, Reaction } from '../../models/chat.model';
-import { ViewMessage, toViewMessages, typingLabel } from '../../services/chat-view';
+import { CardState, ViewMessage, cardState, toViewMessages, typingLabel } from '../../services/chat-view';
 import { Song } from '../../models/song.model';
 import { JamService } from '../../services/jam.service';
 import { PlayerStateService } from '../../services/player-state.service';
@@ -33,8 +33,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   readonly pickerResults = signal<Song[]>([]);
   readonly pickerLoading = signal(false);
   readonly currentSong = signal<Song | null>(null);
-  /** Canciones de la cola por id, para mostrar votos en las tarjetas del chat. */
-  private readonly queue = signal<ReadonlyMap<string, Song>>(new Map());
+  /** Cola y canción actual de la sala, para el estado de las tarjetas del chat. */
+  private readonly queue = signal<Song[]>([]);
+  private readonly playingIndex = signal(-1);
 
   readonly view = computed<ViewMessage[]>(() => toViewMessages(this.jam.messages(), this.jam.myId));
   readonly typingText = computed(() => typingLabel(this.jam.typing()));
@@ -45,7 +46,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   ngOnInit(): void {
     this.subs.push(
-      this.state.playlist$.subscribe(list => this.queue.set(new Map(list.map(s => [s.videoId, s])))),
+      this.state.playlist$.subscribe(list => this.queue.set(list)),
+      this.state.currentIndex$.subscribe(i => this.playingIndex.set(i)),
       this.state.currentSong$.subscribe(song => this.currentSong.set(song))
     );
   }
@@ -132,12 +134,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   // ── Acciones sobre mensajes ─────────────────────────────
 
-  queued(song: Song): Song | undefined {
-    return this.queue().get(song.videoId);
-  }
-
-  isPlayingNow(song: Song): boolean {
-    return this.currentSong()?.videoId === song.videoId;
+  /** ¿La canción del chat suena, ya sonó, espera turno o no está en la cola? */
+  cardOf(song: Song): CardState {
+    return cardState(song, this.queue(), this.playingIndex());
   }
 
   votedByMe(song: Song): boolean {
@@ -149,7 +148,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   isQueued(song: Song): boolean {
-    return this.queue().has(song.videoId);
+    return this.cardOf(song).kind !== 'missing';
   }
 
   addToQueue(song: Song): void {

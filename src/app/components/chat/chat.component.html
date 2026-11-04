@@ -32,20 +32,28 @@
                   </div>
                 </div>
                 <div class="song-actions">
-                  @if (jam.isHost()) {
-                    <button type="button" (click)="playNow(song)">▶ Poner ahora</button>
-                  }
-                  @if (queued(song); as q) {
-                    @if (isPlayingNow(song)) {
+                  @let st = cardOf(song);
+                  @switch (st.kind) {
+                    @case ('playing') {
                       <button type="button" disabled>♪ Sonando</button>
-                    } @else {
-                      <button type="button" class="vote" [class.voted]="votedByMe(q)" (click)="vote(song)"
-                              [attr.aria-pressed]="votedByMe(q)" [title]="votedByMe(q) ? 'Quitar mi voto' : 'Votar para que suene antes'">
-                        👍 {{ q.votes?.length ?? 0 }}
-                      </button>
                     }
-                  } @else {
-                    <button type="button" (click)="addToQueue(song)">+ Pedir</button>
+                    @case ('upcoming') {
+                      @if (st.kind === 'upcoming') {
+                        @if (jam.isHost()) {
+                          <button type="button" (click)="playNow(st.song)">▶ Poner ahora</button>
+                        }
+                        <button type="button" class="vote" [class.voted]="votedByMe(st.song)" (click)="vote(st.song)"
+                                [attr.aria-pressed]="votedByMe(st.song)" [title]="votedByMe(st.song) ? 'Quitar mi voto' : 'Votar para que suene antes'">
+                          👍 {{ st.song.votes?.length ?? 0 }}
+                        </button>
+                      }
+                    }
+                    @case ('played') {
+                      <button type="button" disabled>✓ Ya sonó</button>
+                    }
+                    @default {
+                      <button type="button" (click)="addToQueue(song)">+ Pedir</button>
+                    }
                   }
                   <app-share-button variant="inline" [song]="song" label="Enviar"></app-share-button>
                 </div>

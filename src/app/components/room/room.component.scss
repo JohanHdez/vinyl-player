@@ -66,8 +66,9 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  height: calc(100vh - var(--player-height) - 64px);
-  min-height: 520px;
+  // Ocupa el alto que le da la vista (ver .view-room--active en styles.scss).
+  flex: 1;
+  min-height: 0;
 }
 
 .room-header {
@@ -137,10 +138,56 @@
   min-height: 0;
 }
 
+// Pestañas solo en pantallas angostas
+.room-tabs { display: none; }
+
 @media (max-width: 960px) {
-  .room { height: auto; }
-  .room-grid { grid-template-columns: 1fr; }
-  .room-chat { height: 70vh; }
+  .room { gap: 10px; }
+  .room-header { gap: 10px; }
+  .room-header h1 { font-size: 1.3rem; }
+  .room-people { order: 3; width: 100%; }
+
+  .room-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 999px;
+    background: var(--bg-surface);
+    border: 1px solid var(--glass-border);
+
+    button {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 9px 8px;
+      border: 0;
+      border-radius: 999px;
+      background: none;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 0.88rem;
+      cursor: pointer;
+
+      &.active { background: var(--bg-elevated); color: var(--text-primary); }
+    }
+  }
+
+  .tab-count { font-size: 0.72rem; color: var(--text-tertiary); }
+  .tab-badge {
+    min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+    background: var(--accent-red); color: #fff; font-size: 0.68rem; font-weight: 700;
+    display: inline-grid; place-items: center;
+  }
+
+  // Un panel a la vez, ocupando todo el alto disponible
+  .room-grid { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); }
+  .room-grid[data-tab='chat'] .room-side { display: none; }
+  .room-grid:not([data-tab='chat']) .room-chat { display: none; }
+  .room-grid[data-tab='cola'] .side-info { display: none; }
+  .room-grid[data-tab='sala'] .side-queue { display: none; }
+  .room-side { overflow-y: auto; }
 }
 
 // ── Portada v2: Mis salas, pestañas y formulario ──

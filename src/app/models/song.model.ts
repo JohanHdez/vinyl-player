@@ -10,4 +10,6 @@ export interface Song {
   addedBy?: string;
   addedAt?: number;
   votes?: string[];
+  /** Ids de versiones bloqueadas que esta reemplazó (para encontrarla desde el chat). */
+  replacedFrom?: string[];
 }

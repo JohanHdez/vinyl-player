@@ -104,11 +104,24 @@
       <p class="room-banner" role="status">El anfitrión no está conectado. Puedes seguir pidiendo y votando; la música vuelve cuando regrese.</p>
     }
 
-    <div class="room-grid">
+    <!-- En el celular: un panel a la vez para que el chat use toda la pantalla -->
+    <nav class="room-tabs" role="tablist" aria-label="Secciones de la sala">
+      <button type="button" role="tab" [attr.aria-selected]="tab() === 'chat'" [class.active]="tab() === 'chat'" (click)="setTab('chat')">
+        Chat @if (chatBadge() > 0) { <span class="tab-badge">{{ chatBadge() }}</span> }
+      </button>
+      <button type="button" role="tab" [attr.aria-selected]="tab() === 'cola'" [class.active]="tab() === 'cola'" (click)="setTab('cola')">
+        Cola <span class="tab-count">{{ queueLength() }}</span>
+      </button>
+      <button type="button" role="tab" [attr.aria-selected]="tab() === 'sala'" [class.active]="tab() === 'sala'" (click)="setTab('sala')">
+        Sala <span class="tab-count">{{ jam.participants().length }}</span>
+      </button>
+    </nav>
+
+    <div class="room-grid" [attr.data-tab]="tab()">
       <app-chat class="room-chat"></app-chat>
       <aside class="room-side">
-        <app-playlist></app-playlist>
-        <app-jam-panel></app-jam-panel>
+        <app-playlist class="side-queue"></app-playlist>
+        <app-jam-panel class="side-info"></app-jam-panel>
       </aside>
     </div>
   </div>

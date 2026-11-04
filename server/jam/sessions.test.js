@@ -296,3 +296,29 @@ test("si el anfitrión recarga la página, vuelve como anfitrión sin avisos en 
   assert.equal(offline, false, "los invitados no ven al anfitrión desconectado");
   assert.ok(!seen.some((t) => /desconectó|volvió/.test(t)), "sin avisos de desconexión en el chat");
 });
+
+test("votar una canción que ya sonó o que no está explica por qué", async () => {
+  const { host, guest } = await room();
+  host.emit("add-song", { song: { videoId: "bbbbbbbbbb1", title: "Uno", channel: "" } });
+  await once(guest, "queue-updated");
+  host.emit("play-song", { index: 0 });
+  await once(guest, "song-played");
+
+  const playing = once(guest, "vote-error");
+  guest.emit("vote-song", { videoId: "bbbbbbbbbb1" });
+  assert.match((await playing).message, /sonando/);
+
+  const missing = once(guest, "vote-error");
+  guest.emit("vote-song", { videoId: "zzzzzzzzzz9" });
+  assert.match((await missing).message, /no está en la cola/);
+});
+
+test("una versión reemplazada recuerda el id original", async () => {
+  const { host, guest } = await room();
+  host.emit("add-song", { song: { videoId: "K5VZGDyX_qs", title: "Bloqueada", channel: "" } });
+  await once(guest, "queue-updated");
+  const updated = new Promise((resolve) => guest.on("queue-updated", (q) => { if (q.playlist[0].videoId === "zSeVzG-n6IQ") resolve(q); }));
+  host.emit("replace-song", { index: 0, song: { videoId: "zSeVzG-n6IQ", title: "Oficial", channel: "VEVO" } });
+  const q = await updated;
+  assert.deepEqual(q.playlist[0].replacedFrom, ["K5VZGDyX_qs"]);
+});

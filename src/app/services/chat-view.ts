@@ -1,6 +1,7 @@
 // Cómo se presentan los mensajes del chat, como funciones puras (ver chat-view.spec.ts).
 
 import { ChatMessage, Reaction } from '../models/chat.model';
+import { Song } from '../models/song.model';
 
 /** Mensajes seguidos del mismo autor dentro de esta ventana se agrupan (sin repetir nombre ni avatar). */
 export const GROUP_WINDOW_MS = 5 * 60 * 1000;
@@ -32,4 +33,24 @@ export function typingLabel(names: string[]): string {
   if (names.length === 1) return `${names[0]} está escribiendo…`;
   if (names.length === 2) return `${names[0]} y ${names[1]} están escribiendo…`;
   return 'Varias personas están escribiendo…';
+}
+
+/** Estado de una canción compartida en el chat respecto a la cola de la sala. */
+export type CardState =
+  | { kind: 'playing'; song: Song }
+  | { kind: 'played'; song: Song }
+  | { kind: 'upcoming'; song: Song }
+  | { kind: 'missing' };
+
+/**
+ * Busca la canción del chat en la cola (también si se reemplazó por otra versión)
+ * y dice si suena, ya sonó, espera turno o no está.
+ */
+export function cardState(shared: Pick<Song, 'videoId'>, playlist: Song[], currentIndex: number): CardState {
+  const index = playlist.findIndex(s => s.videoId === shared.videoId || s.replacedFrom?.includes(shared.videoId));
+  if (index < 0) return { kind: 'missing' };
+  const song = playlist[index];
+  if (index === currentIndex) return { kind: 'playing', song };
+  if (index < currentIndex) return { kind: 'played', song };
+  return { kind: 'upcoming', song };
 }

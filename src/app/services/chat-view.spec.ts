@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ChatMessage } from '../models/chat.model';
-import { GROUP_WINDOW_MS, toViewMessages, typingLabel } from './chat-view';
+import { GROUP_WINDOW_MS, cardState, toViewMessages, typingLabel } from './chat-view';
 
 let n = 0;
 const msg = (over: Partial<ChatMessage>): ChatMessage => ({
@@ -49,5 +49,29 @@ describe('typingLabel', () => {
     expect(typingLabel(['Ana'])).toBe('Ana está escribiendo…');
     expect(typingLabel(['Ana', 'Luis'])).toBe('Ana y Luis están escribiendo…');
     expect(typingLabel(['A', 'B', 'C'])).toBe('Varias personas están escribiendo…');
+  });
+});
+
+describe('cardState', () => {
+  const q = [
+    { videoId: 'a', title: 'A', channel: '' },
+    { videoId: 'b', title: 'B', channel: '' },
+    { videoId: 'c', title: 'C', channel: '', replacedFrom: ['bloq'] },
+  ];
+
+  it('distingue la que ya sonó, la que suena y las que esperan', () => {
+    expect(cardState({ videoId: 'a' }, q, 1).kind).toBe('played');
+    expect(cardState({ videoId: 'b' }, q, 1).kind).toBe('playing');
+    expect(cardState({ videoId: 'c' }, q, 1).kind).toBe('upcoming');
+  });
+
+  it('encuentra una canción aunque se haya reemplazado por otra versión', () => {
+    const s = cardState({ videoId: 'bloq' }, q, 1);
+    expect(s.kind).toBe('upcoming');
+    expect(s.kind !== 'missing' && s.song.videoId).toBe('c');
+  });
+
+  it('marca como ausente lo que no está en la cola', () => {
+    expect(cardState({ videoId: 'z' }, q, 1).kind).toBe('missing');
   });
 });

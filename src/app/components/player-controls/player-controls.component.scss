@@ -365,3 +365,13 @@
     height: 34px;
   }
 }
+
+// Celular: que nada se salga de la pantalla.
+@media (max-width: 600px) {
+  .bar-info { min-width: 0; }
+  // Aleatorio y repetir son los menos usados: se ocultan para que quepan los principales.
+  .bar-controls .ctrl-btn:first-child,
+  .bar-controls .ctrl-btn:last-child { display: none; }
+  // Invitado de una sala: no controla la música, solo ve qué suena.
+  .controls-disabled .bar-controls { display: none; }
+}

@@ -114,7 +114,7 @@
 
     <!-- ROOM VIEW -->
     @if (currentView() === 'room') {
-      <div class="view-pane view-room">
+      <div class="view-pane view-room" [class.view-room--active]="jamActive()">
         <app-room></app-room>
       </div>
     }

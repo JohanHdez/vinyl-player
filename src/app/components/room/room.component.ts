@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { JamService } from '../../services/jam.service';
 import { PlayerStateService } from '../../services/player-state.service';
@@ -29,9 +29,34 @@ export class RoomComponent implements OnInit, OnDestroy {
   readonly mode = signal<'create' | 'join'>(this.jam.pendingJamCode() ? 'join' : 'create');
   readonly statuses = signal<Map<string, RoomStatus>>(new Map());
   readonly nowPlaying = toSignal(this.state.currentSong$);
+  readonly queueLength = computed(() => this.playlist()?.length ?? 0);
+  private readonly playlist = toSignal(this.state.playlist$);
+
+  /** Pestaña visible en el celular (en computador se ven todas). */
+  readonly tab = signal<'chat' | 'cola' | 'sala'>('chat');
+  /** Mensajes que llegaron mientras mirabas la cola o la info de la sala. */
+  readonly chatBadge = signal(0);
+  private seenMessages = 0;
+
+  constructor() {
+    // Cuenta los mensajes que llegan mientras miras otra pestaña (en el celular).
+    effect(() => {
+      const total = this.jam.messages().length;
+      if (this.tab() !== 'chat') this.chatBadge.set(Math.max(0, total - this.seenMessages));
+    });
+  }
+
+  setTab(tab: 'chat' | 'cola' | 'sala'): void {
+    this.tab.set(tab);
+    if (tab === 'chat') {
+      this.chatBadge.set(0);
+      this.seenMessages = this.jam.messages().length;
+    }
+  }
 
   ngOnInit(): void {
     this.jam.setRoomVisible(true);
+    this.seenMessages = this.jam.messages().length;
     void this.refreshStatuses();
   }
 
