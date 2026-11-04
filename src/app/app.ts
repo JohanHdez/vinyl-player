@@ -12,10 +12,13 @@ import { JamJoinComponent } from './components/jam-join/jam-join.component';
 import { SuggestionsComponent } from './components/suggestions/suggestions.component';
 import { ExploreComponent } from './components/explore/explore.component';
 import { RoomComponent } from './components/room/room.component';
+import { ShareButtonComponent } from './components/share-button/share-button.component';
+import { songIdFromSearch } from './services/share';
 import { YouTubeService } from './services/youtube.service';
 import { PlayerStateService } from './services/player-state.service';
 import { JamService } from './services/jam.service';
 import { RadioService } from './services/radio.service';
+import { PlaybackRecoveryService } from './services/playback-recovery.service';
 import { Song } from './models/song.model';
 
 export type AppView = 'home' | 'explore' | 'search' | 'nowplaying' | 'library' | 'room';
@@ -36,6 +39,7 @@ export type AppView = 'home' | 'explore' | 'search' | 'nowplaying' | 'library' |
     SuggestionsComponent,
     ExploreComponent,
     RoomComponent,
+    ShareButtonComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
@@ -81,6 +85,7 @@ export class App implements OnInit, OnDestroy {
     private state: PlayerStateService,
     private jamService: JamService,
     readonly radio: RadioService,
+    private recovery: PlaybackRecoveryService,
     private appRef: ApplicationRef,
     private cdr: ChangeDetectorRef
   ) {
@@ -96,6 +101,7 @@ export class App implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.yt.init();
     this.radio.start();
+    this.recovery.start();
     this.subs.push(
       this.state.isPlaying$.subscribe(p => {
         this.isPlaying.set(p);
@@ -108,6 +114,7 @@ export class App implements OnInit, OnDestroy {
       this.state.duration$.subscribe(d => this.duration.set(d))
     );
     this.loadInitialContent();
+    void this.openSharedSong();
     this.jamService.checkUrlForJam();
     this.jamService.attemptRejoin();
   }
@@ -169,6 +176,22 @@ export class App implements OnInit, OnDestroy {
       this.searchLoading.set(false);
       this.appRef.tick();
     }
+  }
+
+  /** Si se abrió un enlace compartido (?song=ID), pone esa canción y muestra el tocadiscos. */
+  private async openSharedSong(): Promise<void> {
+    const videoId = songIdFromSearch(location.search);
+    if (!videoId) return;
+    const url = new URL(location.href);
+    url.searchParams.delete('song');
+    history.replaceState({}, '', url.toString());
+
+    const song = await this.yt.fetchVideoInfo(videoId);
+    this.state.addToPlaylist({ ...song, source: 'user' });
+    const idx = this.state.playlist$.value.findIndex(s => s.videoId === videoId);
+    if (idx >= 0) this.state.play(idx);
+    this.currentView.set('nowplaying');
+    this.state.toast$.next('Te compartieron esta canción. Si no suena, toca ▶');
   }
 
   onAddToPlaylist(song: Song): void {

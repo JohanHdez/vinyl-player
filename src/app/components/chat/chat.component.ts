@@ -8,12 +8,14 @@ import { Song } from '../../models/song.model';
 import { JamService } from '../../services/jam.service';
 import { PlayerStateService } from '../../services/player-state.service';
 import { YouTubeService } from '../../services/youtube.service';
+import { ShareButtonComponent } from '../share-button/share-button.component';
 
 const AVATAR_COLORS = ['#c44b3f', '#c8984c', '#3d8bd9', '#3f9b6a', '#9b6bd1', '#d9823d', '#2fa59c', '#d4577a'];
 
 @Component({
   selector: 'app-chat',
   standalone: true,
+  imports: [ShareButtonComponent],
   templateUrl: './chat.component.html',
   styleUrl: './chat.component.scss',
 })

@@ -1,4 +1,5 @@
 import { Injectable, NgZone } from '@angular/core';
+import { Subject } from 'rxjs';
 import { PlayerStateService } from './player-state.service';
 import { Song } from '../models/song.model';
 import { ArtistPage, CategoryPage, ExploreHome, PlaylistPage } from '../models/explore.model';
@@ -33,6 +34,13 @@ export class YouTubeService {
   private playerReady = false;
   private progressInterval: ReturnType<typeof setInterval> | null = null;
   private pendingVideoId: string | null = null;
+
+  /**
+   * Errores del reproductor (código del IFrame API + video que falló).
+   * PlaybackRecoveryService decide si busca otra versión o pasa a la siguiente.
+   */
+  readonly playbackError$ = new Subject<{ code: number; videoId: string }>();
+  private currentVideoId = '';
 
   /** Callback fired once after next video starts playing */
   private onVideoStarted: (() => void) | null = null;
@@ -89,7 +97,7 @@ export class YouTubeService {
           });
         },
         onStateChange: (e: { data: number }) => this.ngZone.run(() => this.onStateChange(yt, e.data)),
-        onError: () => this.ngZone.run(() => this.onError()),
+        onError: (e: { data: number }) => this.ngZone.run(() => this.onError(e.data)),
       },
     });
   }
@@ -123,12 +131,14 @@ export class YouTubeService {
     }
   }
 
-  private onError(): void {
-    this.state.toast$.next('Esta canción no se puede reproducir. Paso a la siguiente…');
-    setTimeout(() => this.state.playNext(), 1500);
+  private onError(code: number): void {
+    this.stopProgressUpdate();
+    this.state.setPlaying(false);
+    this.playbackError$.next({ code, videoId: this.currentVideoId });
   }
 
   loadVideo(videoId: string): void {
+    this.currentVideoId = videoId;
     if (!this.player || !this.playerReady) {
       this.pendingVideoId = videoId;
       this.state.toast$.next('Cargando reproductor...');

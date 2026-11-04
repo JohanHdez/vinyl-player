@@ -1,16 +1,18 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { JamService } from '../../services/jam.service';
 import { PlayerStateService } from '../../services/player-state.service';
 import { ChatComponent } from '../chat/chat.component';
 import { JamPanelComponent } from '../jam-panel/jam-panel.component';
 import { PlaylistComponent } from '../playlist/playlist.component';
+import { ShareButtonComponent } from '../share-button/share-button.component';
 
 const NAME_KEY = 'vinyl_jam_name';
 
 @Component({
   selector: 'app-room',
   standalone: true,
-  imports: [ChatComponent, JamPanelComponent, PlaylistComponent],
+  imports: [ChatComponent, JamPanelComponent, PlaylistComponent, ShareButtonComponent],
   templateUrl: './room.component.html',
   styleUrl: './room.component.scss',
 })
@@ -21,6 +23,7 @@ export class RoomComponent implements OnInit, OnDestroy {
   readonly name = signal(localStorage.getItem(NAME_KEY) ?? '');
   readonly code = signal(this.jam.pendingJamCode());
   readonly error = signal('');
+  readonly nowPlaying = toSignal(this.state.currentSong$);
 
   ngOnInit(): void {
     this.jam.setRoomVisible(true);
@@ -54,16 +57,6 @@ export class RoomComponent implements OnInit, OnDestroy {
       return;
     }
     this.jam.joinSession(code, name, true);
-  }
-
-  async invite(): Promise<void> {
-    const url = `${location.origin}${location.pathname}?jam=${this.jam.sessionCode()}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      this.state.toast$.next('Enlace de invitación copiado');
-    } catch {
-      window.prompt('Copia este enlace para invitar:', url);
-    }
   }
 
   leave(): void {

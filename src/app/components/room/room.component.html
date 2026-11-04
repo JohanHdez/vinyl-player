@@ -44,7 +44,7 @@
         <span class="room-count">{{ jam.participants().length }} en la sala</span>
       </div>
       <div class="room-actions">
-        <button type="button" class="room-btn room-btn--primary" (click)="invite()">Invitar</button>
+        <app-share-button [roomCode]="jam.sessionCode()" [nowPlaying]="nowPlaying()?.title" label="Invitar"></app-share-button>
         <button type="button" class="room-btn" (click)="leave()">Salir</button>
       </div>
     </header>

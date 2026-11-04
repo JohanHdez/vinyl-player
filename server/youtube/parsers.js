@@ -14,6 +14,11 @@ function textOf(node) {
   return (node.runs || []).map((r) => r.text).join("");
 }
 
+/** Quita el sufijo " - Topic" de los canales automáticos de artistas de YouTube. */
+function cleanArtist(name) {
+  return typeof name === "string" ? name.replace(/\s+-\s+Topic$/i, "").trim() : "";
+}
+
 function isVideoId(value) {
   return typeof value === "string" && VIDEO_ID.test(value);
 }
@@ -119,4 +124,4 @@ function parseRelatedResults(data, seedVideoId, limit = 25) {
   return songs;
 }
 
-module.exports = { textOf, isVideoId, parseSearchResults, parseTrendingResults, parseRelatedResults };
+module.exports = { textOf, isVideoId, cleanArtist, parseSearchResults, parseTrendingResults, parseRelatedResults };

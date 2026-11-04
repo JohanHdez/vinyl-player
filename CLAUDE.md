@@ -97,6 +97,14 @@ docker-compose.yml           # Orquestacion con Docker Compose
 - **PlayerStateService**: estado centralizado con hooks para Jam (onSongAdded, onPaused, etc.). Metodo `setCurrentSongDisplay()` actualiza UI sin disparar YouTube. `playNext()` ya no vuelve al inicio: al final de la cola emite `queueEnded$` (la radio decide si continuar). `autoplay$` se guarda en localStorage (`vinyl.autoplay`).
 - **JamService**: maneja conexion Socket.IO, sincronizacion de playlist y playback entre participantes. Signal `listenLocally` controla si el audio se reproduce localmente o en el host.
 
+### Compartir y vista previa (server/share.js)
+- `index.html` NO se sirve como estatico: pasa por `createIndexHandler`, que reemplaza el bloque `share-meta` con og:title/og:image segun `?song=` (titulo y portada via InnerTube, cache 6 h) o `?jam=`. Respeta `X-Forwarded-Proto/Host` (ngrok).
+- Cliente: `services/share.ts` (puro) + `ShareButtonComponent` (WhatsApp via wa.me, copiar, Web Share API). `?song=ID` abre la cancion al cargar (`App.openSharedSong`).
+
+### Versiones bloqueadas fuera de YouTube
+- Desde el servidor no se puede saber si un video permite insercion (InnerTube devuelve error 152 para todos), asi que se detecta en el navegador: errores 100/101/150 del IFrame API.
+- `PlaybackRecoveryService` busca la misma cancion (`recovery.ts`: palabras clave + similitud >= 0.6), prueba hasta 4 versiones con `replaceSong` y avisa cual puso. En una sala solo el host reemplaza (evento `replace-song` / `song-replaced`).
+
 ### Salas (Jam Sessions + chat)
 - En la UI se llaman "Salas" (vista `room`). La portada pide nombre y permite crear o unirse con codigo; al entrar, la app cambia sola a la vista de la sala.
 - `JamService` expone `messages`, `typing`, `unread` (signals) y `sendMessage`, `shareSong`, `react`, `notifyTyping` (max. 1 cada 2 s).

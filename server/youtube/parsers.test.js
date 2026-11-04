@@ -3,7 +3,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fixture = require("./__fixtures__/next-music.json");
-const { parseRelatedResults, parseSearchResults, textOf, isVideoId } = require("./parsers");
+const { parseRelatedResults, parseSearchResults, textOf, isVideoId, cleanArtist } = require("./parsers");
 
 const SEED = "lTRiuFIWV54";
 
@@ -62,4 +62,10 @@ test("textOf y isVideoId", () => {
   assert.equal(textOf(undefined), "");
   assert.ok(isVideoId("lTRiuFIWV54"));
   assert.ok(!isVideoId("../../etc"));
+});
+
+test("cleanArtist quita el sufijo de los canales automáticos", () => {
+  assert.equal(cleanArtist("Los Ángeles Azules - Topic"), "Los Ángeles Azules");
+  assert.equal(cleanArtist("Lofi Girl"), "Lofi Girl");
+  assert.equal(cleanArtist(undefined), "");
 });

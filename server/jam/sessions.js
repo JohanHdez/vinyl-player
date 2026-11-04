@@ -125,6 +125,16 @@ io.on("connection", (socket) => {
     handler(session, me, payload);
   };
 
+  // El anfitrión cambia una versión bloqueada fuera de YouTube por otra que sí suena.
+  socket.on("replace-song", withSession((session, _me, { index, song }) => {
+    if (session.hostId !== socket.id) return;
+    const clean = chat.cleanSong(song);
+    if (!clean || !Number.isInteger(index) || index < 0 || index >= session.playlist.length) return;
+    const replacement = { ...clean, ...(song.source === "radio" ? { source: "radio" } : {}) };
+    session.playlist[index] = replacement;
+    socket.to(session.sessionId).emit("song-replaced", { index, song: replacement });
+  }));
+
   const allowed = () => {
     if (chatLimiter.allow(socket.id)) return true;
     socket.emit("chat-error", { message: "Vas muy rápido. Espera unos segundos." });

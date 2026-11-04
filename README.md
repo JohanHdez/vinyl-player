@@ -11,6 +11,8 @@ Reproductor de musica web con estetica de tocadiscos vintage. Busca y reproduce 
 - **Sugerencias "Porque escuchas..."** — Canciones parecidas a la actual para reproducir ya o agregar a la cola, y una fila "Mas como..." en Inicio
 - **Tendencias** — Grid de canciones en tendencia desde YouTube Music
 - **Explorar** — Generos y estados de animo (como YouTube Music), artistas principales, paginas de artista con sus canciones mas escuchadas y artistas parecidos, y listas destacadas por categoria
+- **Compartir por WhatsApp** — Enlace a una cancion (`?song=`) o a una sala (`?jam=`) con vista previa: titulo, artista y portada de la cancion
+- **Versiones bloqueadas** — Si YouTube no deja reproducir un video fuera de su sitio, busca otra version de la misma cancion y la pone en su lugar
 - **Salas** — Chat en tiempo real tipo Messenger: burbujas, "esta escribiendo...", reacciones, canciones compartidas como tarjetas con "Poner ahora" / "+ Cola", avisos de quien entra o agrega musica, historial para quien llega tarde y contador de no leidos
 - **Jam Sessions** — Sesiones colaborativas en tiempo real:
   - Crea una sesion y comparte el codigo QR

@@ -50,6 +50,12 @@ export class JamService {
     this.state.onSongRemoved = (index: number) => {
       if (!this.suppressEmit) this.emitRemoveSong(index);
     };
+    // Solo el anfitrión reemplaza versiones bloqueadas, y lo comparte con todos.
+    this.state.onSongReplaced = (index: number, song: Song) => {
+      if (!this.suppressEmit && this.socket && this.isInSession() && this.isHost()) {
+        this.socket.emit('replace-song', { index, song });
+      }
+    };
     this.state.onSongPlayed = (index: number) => {
       if (!this.suppressEmit) this.emitPlaySong(index);
     };
@@ -345,6 +351,13 @@ export class JamService {
     this.socket.on('song-added', (data: { song: Song }) => {
       this.suppressEmit = true;
       this.state.addToPlaylist(data.song);
+      this.suppressEmit = false;
+    });
+
+    this.socket.on('song-replaced', (data: { index: number; song: Song }) => {
+      this.suppressEmit = true;
+      this.state.replaceSong(data.index, data.song);
+      if (data.index === this.state.currentIndex && this.shouldPlayLocally) this.state.play(data.index);
       this.suppressEmit = false;
     });
 

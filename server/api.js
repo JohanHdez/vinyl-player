@@ -7,6 +7,7 @@ const express = require("express");
 const { innertube: defaultInnertube } = require("./youtube/innertube");
 const {
   isVideoId,
+  cleanArtist,
   parseSearchResults,
   parseTrendingResults,
   parseRelatedResults,
@@ -63,7 +64,7 @@ function createApiRouter({ innertube = defaultInnertube, logger = console } = {}
     res.json({
       videoId,
       title: details?.title || "Video de YouTube",
-      channel: details?.author || "",
+      channel: cleanArtist(details?.author),
     });
   }));
 

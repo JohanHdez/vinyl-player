@@ -38,6 +38,7 @@
                   } @else {
                     <button type="button" (click)="addToQueue(song)">+ Cola</button>
                   }
+                  <app-share-button variant="inline" [song]="song" label="Enviar"></app-share-button>
                 </div>
               }
               @if (m.text) {

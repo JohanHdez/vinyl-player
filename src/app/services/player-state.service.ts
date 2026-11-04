@@ -41,6 +41,7 @@ export class PlayerStateService {
   suppressToast = false;
   onSongAdded: ((song: Song) => void) | null = null;
   onSongRemoved: ((index: number) => void) | null = null;
+  onSongReplaced: ((index: number, song: Song) => void) | null = null;
   onSongPlayed: ((index: number) => void) | null = null;
   onPaused: ((currentTime: number) => void) | null = null;
   onResumed: ((currentTime: number) => void) | null = null;
@@ -79,6 +80,18 @@ export class PlayerStateService {
     } finally {
       this.suppressToast = previous;
     }
+  }
+
+  /**
+   * Cambia la canción en `index` por otra versión (p. ej. cuando YouTube no deja
+   * reproducir la original fuera de su sitio). No la reproduce.
+   */
+  replaceSong(index: number, song: Song): void {
+    if (index < 0 || index >= this.playlist.length) return;
+    this.playlist[index] = song;
+    this.playlist$.next([...this.playlist]);
+    if (index === this._currentIndex) this.currentSong$.next(song);
+    if (this.onSongReplaced) this.onSongReplaced(index, song);
   }
 
   removeFromPlaylist(index: number): void {

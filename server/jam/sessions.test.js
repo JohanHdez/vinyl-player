@@ -145,3 +145,24 @@ test("quien escribe aparece para los demás", async () => {
   guest.emit("typing");
   assert.equal((await typing).name, "Luis");
 });
+
+test("solo el anfitrión puede reemplazar una canción bloqueada, y llega a los demás", async () => {
+  const { host, guest } = await room();
+  const a = { videoId: "K5VZGDyX_qs", title: "Bloqueada", channel: "" };
+  host.emit("add-song", { song: a });
+  await once(guest, "song-added");
+
+  // Un invitado no puede reemplazar
+  let guestReplaced = false;
+  host.once("song-replaced", () => { guestReplaced = true; });
+  guest.emit("replace-song", { index: 0, song: { videoId: "zSeVzG-n6IQ", title: "Otra", channel: "" } });
+
+  // El anfitrión sí; un id inválido se ignora
+  const replaced = once(guest, "song-replaced");
+  host.emit("replace-song", { index: 0, song: { videoId: "../x", title: "mal" } });
+  host.emit("replace-song", { index: 0, song: { videoId: "zSeVzG-n6IQ", title: "De Niña a Mujer", channel: "VEVO" } });
+  const data = await replaced;
+  assert.equal(data.index, 0);
+  assert.equal(data.song.videoId, "zSeVzG-n6IQ");
+  assert.equal(guestReplaced, false);
+});

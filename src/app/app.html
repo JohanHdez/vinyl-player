@@ -154,6 +154,7 @@
               <div class="nowplaying-info">
                 <h2 class="nowplaying-title font-display">{{ currentSong()?.title }}</h2>
                 <p class="nowplaying-artist">{{ currentSong()?.channel }}</p>
+                <app-share-button class="nowplaying-share" [song]="currentSong()" label="Compartir canción"></app-share-button>
               </div>
             }
             @if (jamActive()) {

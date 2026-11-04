@@ -1,0 +1,79 @@
+:host { display: inline-block; }
+
+.share { position: relative; display: inline-flex; }
+.share--inline { flex: 1; }
+
+.share-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  cursor: pointer;
+
+  svg { width: 16px; height: 16px; fill: currentColor; }
+  &:hover { border-color: var(--accent-brass); }
+  &:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
+
+  &--icon { width: 36px; height: 36px; padding: 0; }
+
+  // Igual que los botones de la tarjeta de canción del chat
+  &--inline {
+    width: 100%;
+    font-size: 0.76rem;
+    padding: 6px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(0, 0, 0, 0.25);
+    svg { width: 13px; height: 13px; }
+  }
+}
+
+.share-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.8);
+}
+
+.share-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.86rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+
+  svg { width: 18px; height: 18px; fill: var(--text-secondary); flex: none; }
+  &:hover, &:focus-visible { background: var(--glass-highlight); outline: none; }
+
+  &--wa svg { fill: #25d366; }
+}
+
+.share-warn {
+  margin: 4px 6px 2px;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #f0b27a;
+}
