@@ -16,6 +16,7 @@ Aplicacion web de reproductor de musica estilo vinyl/tocadiscos con integracion 
 - `npm run proxy` — Servidor Express proxy + Socket.IO (puerto 3001)
 - `npm run build` — Build de produccion
 - `npm run tunnel` — Tunel ngrok para compartir sesiones Jam (requiere NGROK_AUTHTOKEN en .env)
+- `npm test` — Pruebas unitarias: cliente con Vitest (`src/**/*.spec.ts`) y servidor con `node:test` (`server/**/*.test.js`)
 - `npm run cy:open` / `npm run cy:run` — Cypress E2E tests
 - `docker compose up --build` — Build y levantar con Docker (puerto 3001)
 - `docker compose up --build -d` — Igual pero en background
@@ -90,8 +91,10 @@ docker-compose.yml           # Orquestacion con Docker Compose
 - **Componentes usan** `styleUrl` (singular) apuntando a archivo .scss separado
 
 ### Servicios
-- **YouTubeService**: carga IFrame API, reproduce videos, hace llamadas al proxy `/api/search`, `/api/trending`, `/api/video-info`
-- **PlayerStateService**: estado centralizado con hooks para Jam (onSongAdded, onPaused, etc.). Metodo `setCurrentSongDisplay()` actualiza UI sin disparar YouTube.
+- **YouTubeService**: carga IFrame API (tipado, sin `any`), reproduce videos, hace llamadas al proxy `/api/search`, `/api/trending`, `/api/video-info`, `/api/related`
+- **RadioService**: sugerencias "Porque escuchas..." (signals) y radio automatica. Cuando quedan menos de `RADIO_LOW_WATER` canciones por delante, agrega `RADIO_BATCH` parecidas; en una Jam solo el host extiende la cola.
+- **queue.ts**: reglas de la cola como funciones puras (`nextIndex`, `pickRadioSongs`...). Toda logica nueva de cola va aqui con su prueba en `queue.spec.ts`.
+- **PlayerStateService**: estado centralizado con hooks para Jam (onSongAdded, onPaused, etc.). Metodo `setCurrentSongDisplay()` actualiza UI sin disparar YouTube. `playNext()` ya no vuelve al inicio: al final de la cola emite `queueEnded$` (la radio decide si continuar). `autoplay$` se guarda en localStorage (`vinyl.autoplay`).
 - **JamService**: maneja conexion Socket.IO, sincronizacion de playlist y playback entre participantes. Signal `listenLocally` controla si el audio se reproduce localmente o en el host.
 
 ### Jam Sessions
@@ -104,10 +107,14 @@ docker-compose.yml           # Orquestacion con Docker Compose
 - **Drift correction**: si diferencia > 2 segundos, se corrige posicion
 - **Reconexion**: grace period de 5 minutos, localStorage guarda codigo/nombre/modo
 
-### Servidor Proxy (server/proxy.js)
-- Puerto 3001
-- Endpoints: POST `/api/search`, `/api/trending`, `/api/video-info`
-- Parsea respuestas de YouTube InnerTube API
+### Servidor (server/)
+- Puerto 3001 (`PORT` lo sobreescribe). `proxy.js` solo arma el servidor; la logica vive en modulos:
+  - `api.js` — rutas; recibe `innertube` por parametro para probarse sin red (`api.test.js`)
+  - `youtube/innertube.js` — transporte con timeout de 8 s; `youtube/parsers.js` — parsers puros con fixtures en `youtube/__fixtures__`
+  - `youtube/cache.js` — TTL: related 30 min, trending 15 min
+  - `jam/sessions.js` — Socket.IO (sin cambios de comportamiento)
+- Endpoints: POST `/api/search`, `/api/trending`, `/api/video-info`, `/api/related` (radio de YouTube Music: `next` con `playlistId: RDAMVM<videoId>`)
+- Valida `videoId` (11 caracteres) y `query` (max. 200); responde 502 si YouTube falla
 - Maneja sesiones Jam en memoria con codigos de 6 caracteres
 - Participantes almacenan `listenLocally` flag
 - Emite `duration` en sync-playback y sync-state

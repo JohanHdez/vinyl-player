@@ -7,10 +7,12 @@
     "proxy": "node server/proxy.js",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
+    "test": "npm run test:unit && npm run test:server",
     "cy:open": "cypress open",
     "cy:run": "cypress run",
-    "tunnel": "node server/tunnel.js"
+    "tunnel": "node server/tunnel.js",
+    "test:unit": "vitest run",
+    "test:server": "node --test \"server/**/*.test.js\""
   },
   "prettier": {
     "printWidth": 100,
@@ -48,6 +50,7 @@
     "@ngrok/ngrok": "^1.7.0",
     "@types/qrcode": "^1.5.6",
     "cypress": "^15.10.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "vitest": "^4.1.12"
   }
 }

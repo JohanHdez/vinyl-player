@@ -1,0 +1,429 @@
+{
+ "contents": {
+  "singleColumnMusicWatchNextResultsRenderer": {
+   "tabbedRenderer": {
+    "watchNextTabbedResultsRenderer": {
+     "tabs": [
+      {
+       "tabRenderer": {
+        "content": {
+         "musicQueueRenderer": {
+          "content": {
+           "playlistPanelRenderer": {
+            "contents": [
+             {
+              "playlistPanelVideoRenderer": {
+               "videoId": "lTRiuFIWV54",
+               "title": {
+                "runs": [
+                 {
+                  "text": "1 A.M Study Session 📚 [lofi hip hop]"
+                 }
+                ]
+               },
+               "shortBylineText": {
+                "runs": [
+                 {
+                  "text": "Lofi Girl"
+                 }
+                ]
+               },
+               "longBylineText": {
+                "runs": [
+                 {
+                  "text": "Lofi Girl",
+                  "navigationEndpoint": {
+                   "clickTrackingParams": "CMsGEMggGAAiEwjJzYOr1e6XAxU9y9IEHUoxIbjKAQQQyFuX",
+                   "browseEndpoint": {
+                    "browseId": "UCSJ4gkVC6NrvII8umztf0Ow",
+                    "browseEndpointContextSupportedConfigs": {
+                     "browseEndpointContextMusicConfig": {
+                      "pageType": "MUSIC_PAGE_TYPE_USER_CHANNEL"
+                     }
+                    }
+                   }
+                  }
+                 }
+                ]
+               },
+               "lengthText": {
+                "runs": [
+                 {
+                  "text": "1:01:14"
+                 }
+                ],
+                "accessibility": {
+                 "accessibilityData": {
+                  "label": "1 hora, 1 minuto y 14 segundos"
+                 }
+                }
+               }
+              }
+             },
+             {
+              "playlistPanelVideoRenderer": {
+               "videoId": "xVf4Zk8CBj0",
+               "title": {
+                "runs": [
+                 {
+                  "text": "(FREE) Lo-fi Type Beat - I Need a Girl"
+                 }
+                ]
+               },
+               "shortBylineText": {
+                "runs": [
+                 {
+                  "text": "Lee"
+                 }
+                ]
+               },
+               "longBylineText": {
+                "runs": [
+                 {
+                  "text": "Lee",
+                  "navigationEndpoint": {
+                   "clickTrackingParams": "CLsGEMggGAEiEwjJzYOr1e6XAxU9y9IEHUoxIbjKAQQQyFuX",
+                   "browseEndpoint": {
+                    "browseId": "UCaH9AQy86DBIg-BpWzj-csQ",
+                    "browseEndpointContextSupportedConfigs": {
+                     "browseEndpointContextMusicConfig": {
+                      "pageType": "MUSIC_PAGE_TYPE_USER_CHANNEL"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "text": " • "
+                 },
+                 {
+                  "text": "34 M de visualizaciones"
+                 },
+                 {
+                  "text": " • "
+                 },
+                 {
+                  "text": "702 K Me gusta"
+                 }
+                ]
+               },
+               "lengthText": {
+                "runs": [
+                 {
+                  "text": "4:09"
+                 }
+                ],
+                "accessibility": {
+                 "accessibilityData": {
+                  "label": "4 minutos y 9 segundos"
+                 }
+                }
+               }
+              }
+             },
+             {
+              "playlistPanelVideoRenderer": {
+               "videoId": "kQdl8VtwId8",
+               "title": {
+                "runs": [
+                 {
+                  "text": "until i lose my hearing."
+                 }
+                ]
+               },
+               "shortBylineText": {
+                "runs": [
+                 {
+                  "text": "Powfu"
+                 },
+                 {
+                  "text": ", "
+                 },
+                 {
+                  "text": "Jhove"
+                 },
+                 {
+                  "text": " y "
+                 },
+                 {
+                  "text": "Lofi Girl"
+                 }
+                ]
+               },
+               "longBylineText": {
+                "runs": [
+                 {
+                  "text": "Powfu",
+                  "navigationEndpoint": {
+                   "clickTrackingParams": "CKoGEMggGAIiEwjJzYOr1e6XAxU9y9IEHUoxIbjKAQQQyFuX",
+                   "browseEndpoint": {
+                    "browseId": "UC809pdzoMWSNMvbAoSSvuHA",
+                    "browseEndpointContextSupportedConfigs": {
+                     "browseEndpointContextMusicConfig": {
+                      "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "text": ", "
+                 },
+                 {
+                  "text": "Jhove",
+                  "navigationEndpoint": {
+                   "clickTrackingParams": "CKoGEMggGAIiEwjJzYOr1e6XAxU9y9IEHUoxIbjKAQQQyFuX",
+                   "browseEndpoint": {
+                    "browseId": "UCATsYGQB_BOFh2JOWoMMC6w",
+                    "browseEndpointContextSupportedConfigs": {
+                     "browseEndpointContextMusicConfig": {
+                      "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "text": " y "
+                 },
+                 {
+                  "text": "Lofi Girl",
+                  "navigationEndpoint": {
+                   "clickTrackingParams": "CKoGEMggGAIiEwjJzYOr1e6XAxU9y9IEHUoxIbjKAQQQyFuX",
+                   "browseEndpoint": {
+                    "browseId": "UCi5YpRRZmwegT235crEZ2YQ",
+                    "browseEndpointContextSupportedConfigs": {
+                     "browseEndpointContextMusicConfig": {
+                      "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "text": " • "
+                 },
+                 {
+                  "text": "313 K visualizaciones"
+                 },
+                 {
+                  "text": " • "
+                 },
+                 {
+                  "text": "6,7 K Me gusta"
+                 }
+                ]
+               },
+               "lengthText": {
+                "runs": [
+                 {
+                  "text": "2:42"
+                 }
+                ],
+                "accessibility": {
+                 "accessibilityData": {
+                  "label": "2 minutos y 42 segundos"
+                 }
+                }
+               }
+              }
+             },
+             {
+              "playlistPanelVideoRenderer": {
+               "videoId": "orNPx2uNE0g",
+               "title": {
+                "runs": [
+                 {
+                  "text": "Righteous by Juice WRLD but it's lofi hip hop radio - beats to relax/study to."
+                 }
+                ]
+               },
+               "shortBylineText": {
+                "runs": [
+                 {
+                  "text": "Zeuz Makes Music"
+                 }
+                ]
+               },
+               "longBylineText": {
+                "runs": [
+                 {
+                  "text": "Zeuz Makes Music",
+                  "navigationEndpoint": {
+                   "clickTrackingParams": "CJoGEMggGAMiEwjJzYOr1e6XAxU9y9IEHUoxIbjKAQQQyFuX",
+                   "browseEndpoint": {
+                    "browseId": "UCUbPOZsj9HBdCzikY2-Ud3A",
+                    "browseEndpointContextSupportedConfigs": {
+                     "browseEndpointContextMusicConfig": {
+                      "pageType": "MUSIC_PAGE_TYPE_USER_CHANNEL"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "text": " • "
+                 },
+                 {
+                  "text": "490 K visualizaciones"
+                 },
+                 {
+                  "text": " • "
+                 },
+                 {
+                  "text": "11 K Me gusta"
+                 }
+                ]
+               },
+               "lengthText": {
+                "runs": [
+                 {
+                  "text": "4:43"
+                 }
+                ],
+                "accessibility": {
+                 "accessibilityData": {
+                  "label": "4 minutos y 43 segundos"
+                 }
+                }
+               }
+              }
+             },
+             {
+              "playlistPanelVideoRenderer": {
+               "videoId": "l797F57rL1o",
+               "title": {
+                "runs": [
+                 {
+                  "text": "ＬＯＶＥ ＴＡＰＥＳ❤️"
+                 }
+                ]
+               },
+               "shortBylineText": {
+                "runs": [
+                 {
+                  "text": "Ambition"
+                 }
+                ]
+               },
+               "longBylineText": {
+                "runs": [
+                 {
+                  "text": "Ambition",
+                  "navigationEndpoint": {
+                   "clickTrackingParams": "CIoGEMggGAQiEwjJzYOr1e6XAxU9y9IEHUoxIbjKAQQQyFuX",
+                   "browseEndpoint": {
+                    "browseId": "UC4X7J9D6VbTIwnFDFNkfQ1A",
+                    "browseEndpointContextSupportedConfigs": {
+                     "browseEndpointContextMusicConfig": {
+                      "pageType": "MUSIC_PAGE_TYPE_USER_CHANNEL"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "text": " • "
+                 },
+                 {
+                  "text": "48 K visualizaciones"
+                 },
+                 {
+                  "text": " • "
+                 },
+                 {
+                  "text": "3 K Me gusta"
+                 }
+                ]
+               },
+               "lengthText": {
+                "runs": [
+                 {
+                  "text": "16:19"
+                 }
+                ],
+                "accessibility": {
+                 "accessibilityData": {
+                  "label": "16 minutos y 19 segundos"
+                 }
+                }
+               }
+              }
+             },
+             {
+              "playlistPanelVideoRenderer": {
+               "videoId": "M9Y2p5l6IWU",
+               "title": {
+                "runs": [
+                 {
+                  "text": "ＧＯＯＤＢＹＥ *FREE* LOFI HIP HOP TYPE BEAT (SAD CHILL INSTRUMENTAL)"
+                 }
+                ]
+               },
+               "shortBylineText": {
+                "runs": [
+                 {
+                  "text": "Ahnboi"
+                 }
+                ]
+               },
+               "longBylineText": {
+                "runs": [
+                 {
+                  "text": "Ahnboi",
+                  "navigationEndpoint": {
+                   "clickTrackingParams": "CPoFEMggGAUiEwjJzYOr1e6XAxU9y9IEHUoxIbjKAQQQyFuX",
+                   "browseEndpoint": {
+                    "browseId": "UCp4CBKvTGOkL0tGxl67-QUg",
+                    "browseEndpointContextSupportedConfigs": {
+                     "browseEndpointContextMusicConfig": {
+                      "pageType": "MUSIC_PAGE_TYPE_USER_CHANNEL"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "text": " • "
+                 },
+                 {
+                  "text": "2,8 M de visualizaciones"
+                 },
+                 {
+                  "text": " • "
+                 },
+                 {
+                  "text": "75 K Me gusta"
+                 }
+                ]
+               },
+               "lengthText": {
+                "runs": [
+                 {
+                  "text": "2:52"
+                 }
+                ],
+                "accessibility": {
+                 "accessibilityData": {
+                  "label": "2 minutos y 52 segundos"
+                 }
+                }
+               }
+              }
+             },
+             {
+              "automixPreviewVideoRenderer": {}
+             }
+            ]
+           }
+          }
+         }
+        }
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+}

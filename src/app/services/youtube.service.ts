@@ -3,19 +3,38 @@ import { PlayerStateService } from './player-state.service';
 import { Song } from '../models/song.model';
 import { PROXY_URL } from './proxy-url';
 
-declare var YT: any;
+// Tipos mínimos del YouTube IFrame API: solo lo que usamos.
+interface YTPlayer {
+  loadVideoById(videoId: string): void;
+  playVideo(): void;
+  pauseVideo(): void;
+  seekTo(seconds: number, allowSeekAhead?: boolean): void;
+  setVolume(volume: number): void;
+  getDuration(): number;
+  getCurrentTime(): number;
+}
+
+interface YTNamespace {
+  Player: new (elementId: string, options: object) => YTPlayer;
+  PlayerState: { ENDED: number; PLAYING: number; PAUSED: number };
+}
+
+declare global {
+  interface Window {
+    YT?: YTNamespace;
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
 
 @Injectable({ providedIn: 'root' })
 export class YouTubeService {
-  private player: any = null;
+  private player: YTPlayer | null = null;
   private playerReady = false;
-  private progressInterval: any = null;
+  private progressInterval: ReturnType<typeof setInterval> | null = null;
   private pendingVideoId: string | null = null;
 
   /** Callback fired once after next video starts playing */
   private onVideoStarted: (() => void) | null = null;
-
-  private readonly PROXY_URL = PROXY_URL;
 
   constructor(
     private state: PlayerStateService,
@@ -25,14 +44,12 @@ export class YouTubeService {
   init(): void {
     this.loadIFrameAPI();
     this.state.playSong$.subscribe(song => this.loadVideo(song.videoId));
-    this.state.volume$.subscribe(vol => {
-      if (this.playerReady) this.player.setVolume(vol);
-    });
+    this.state.volume$.subscribe(vol => this.player?.setVolume(vol));
   }
 
   private loadIFrameAPI(): void {
-    if ((window as any).YT && (window as any).YT.Player) {
-      this.createPlayer();
+    if (window.YT?.Player) {
+      this.createPlayer(window.YT);
       return;
     }
 
@@ -40,13 +57,13 @@ export class YouTubeService {
     tag.src = 'https://www.youtube.com/iframe_api';
     document.head.appendChild(tag);
 
-    (window as any).onYouTubeIframeAPIReady = () => {
-      this.ngZone.run(() => this.createPlayer());
+    window.onYouTubeIframeAPIReady = () => {
+      this.ngZone.run(() => window.YT && this.createPlayer(window.YT));
     };
   }
 
-  private createPlayer(): void {
-    this.player = new YT.Player('yt-player', {
+  private createPlayer(yt: YTNamespace): void {
+    this.player = new yt.Player('yt-player', {
       height: '1',
       width: '1',
       playerVars: {
@@ -61,32 +78,36 @@ export class YouTubeService {
         onReady: () => {
           this.ngZone.run(() => {
             this.playerReady = true;
-            this.player.setVolume(this.state.volume$.value);
+            this.player?.setVolume(this.state.volume$.value);
             // Play any video that was queued before player was ready
             if (this.pendingVideoId) {
               const vid = this.pendingVideoId;
               this.pendingVideoId = null;
-              // Preserve any pending callback
-              this.player.loadVideoById(vid);
+              this.player?.loadVideoById(vid);
             }
           });
         },
-        onStateChange: (e: any) => this.ngZone.run(() => this.onStateChange(e)),
+        onStateChange: (e: { data: number }) => this.ngZone.run(() => this.onStateChange(yt, e.data)),
         onError: () => this.ngZone.run(() => this.onError()),
       },
     });
   }
 
-  private onStateChange(e: any): void {
-    if (e.data === YT.PlayerState.ENDED) {
+  private onStateChange(yt: YTNamespace, playerState: number): void {
+    const { ENDED, PLAYING, PAUSED } = yt.PlayerState;
+
+    if (playerState === ENDED) {
       if (this.state.repeat$.value) {
-        this.player.seekTo(0);
-        this.player.playVideo();
-      } else {
-        this.state.playNext();
+        this.player?.seekTo(0);
+        this.player?.playVideo();
+        return;
       }
+      this.state.setPlaying(false);
+      this.stopProgressUpdate();
+      // Si la cola terminó, PlayerState avisa con queueEnded$ y la radio continúa.
+      this.state.playNext();
     }
-    if (e.data === YT.PlayerState.PLAYING) {
+    if (playerState === PLAYING) {
       this.state.setPlaying(true);
       this.startProgressUpdate();
       if (this.onVideoStarted) {
@@ -95,19 +116,19 @@ export class YouTubeService {
         cb();
       }
     }
-    if (e.data === YT.PlayerState.PAUSED) {
+    if (playerState === PAUSED) {
       this.state.setPlaying(false);
       this.stopProgressUpdate();
     }
   }
 
   private onError(): void {
-    this.state.toast$.next('Error al reproducir. Intentando siguiente...');
+    this.state.toast$.next('Esta canción no se puede reproducir. Paso a la siguiente…');
     setTimeout(() => this.state.playNext(), 1500);
   }
 
   loadVideo(videoId: string): void {
-    if (!this.playerReady) {
+    if (!this.player || !this.playerReady) {
       this.pendingVideoId = videoId;
       this.state.toast$.next('Cargando reproductor...');
       return;
@@ -122,39 +143,29 @@ export class YouTubeService {
   }
 
   play(): void {
-    if (this.playerReady) this.player.playVideo();
+    if (this.playerReady) this.player?.playVideo();
   }
 
   pause(): void {
-    if (this.playerReady) this.player.pauseVideo();
+    if (this.playerReady) this.player?.pauseVideo();
   }
 
   seekTo(seconds: number): void {
-    if (this.playerReady) this.player.seekTo(seconds, true);
+    if (this.playerReady) this.player?.seekTo(seconds, true);
   }
 
   getDuration(): number {
-    if (this.playerReady && this.player.getDuration) {
-      return this.player.getDuration() || 0;
-    }
-    return 0;
+    return this.playerReady ? this.player?.getDuration() || 0 : 0;
   }
 
   getCurrentTime(): number {
-    if (this.playerReady && this.player.getCurrentTime) {
-      return this.player.getCurrentTime() || 0;
-    }
-    return 0;
+    return this.playerReady ? this.player?.getCurrentTime() || 0 : 0;
   }
 
   private startProgressUpdate(): void {
     this.stopProgressUpdate();
     this.progressInterval = setInterval(() => {
-      this.ngZone.run(() => {
-        const current = this.getCurrentTime();
-        const duration = this.getDuration();
-        this.state.updateTime(current, duration);
-      });
+      this.ngZone.run(() => this.state.updateTime(this.getCurrentTime(), this.getDuration()));
     }, 250);
   }
 
@@ -169,7 +180,7 @@ export class YouTubeService {
 
   extractVideoId(input: string): string | null {
     const patterns = [
-      /(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
+      /(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|music\.youtube\.com\/watch\?.*v=)([a-zA-Z0-9_-]{11})/,
       /^([a-zA-Z0-9_-]{11})$/,
     ];
     for (const p of patterns) {
@@ -179,48 +190,43 @@ export class YouTubeService {
     return null;
   }
 
-  async search(query: string): Promise<Song[]> {
+  /** POST a la API propia; devuelve `items` o [] si algo falla. */
+  private async postItems(endpoint: string, body: object): Promise<Song[]> {
     try {
-      const resp = await fetch(`${this.PROXY_URL}/api/search`, {
+      const resp = await fetch(`${PROXY_URL}/api/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify(body),
       });
-
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      return (data.items || []) as Song[];
+      const data: { items?: Song[] } = await resp.json();
+      return data.items ?? [];
     } catch (err) {
-      console.error('Search error:', err);
+      console.error(`[api/${endpoint}]`, err);
       return [];
     }
   }
 
-  async fetchTrending(): Promise<Song[]> {
-    try {
-      const resp = await fetch(`${this.PROXY_URL}/api/trending`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
+  search(query: string): Promise<Song[]> {
+    return this.postItems('search', { query });
+  }
 
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      return (data.items || []) as Song[];
-    } catch (err) {
-      console.error('Trending error:', err);
-      return [];
-    }
+  fetchTrending(): Promise<Song[]> {
+    return this.postItems('trending', {});
+  }
+
+  /** Canciones parecidas a `videoId` (la radio de YouTube Music para esa canción). */
+  fetchRelated(videoId: string): Promise<Song[]> {
+    return this.postItems('related', { videoId });
   }
 
   async fetchVideoInfo(videoId: string): Promise<Song> {
     try {
-      const resp = await fetch(`${this.PROXY_URL}/api/video-info`, {
+      const resp = await fetch(`${PROXY_URL}/api/video-info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoId }),
       });
-
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       return await resp.json();
     } catch {

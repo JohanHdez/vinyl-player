@@ -7,6 +7,8 @@ Reproductor de musica web con estetica de tocadiscos vintage. Busca y reproduce 
 - **Tocadiscos animado** — Vinilo giratorio con refraccion de luz, brazo con aguja, plinto de madera con textura de grano
 - **Busqueda de YouTube** — Busca canciones o pega URLs de YouTube directamente
 - **Playlist** — Cola de reproduccion con barras de ecualizador animadas
+- **Radio automatica** — Al acabarse la cola, sigue sola con canciones parecidas a la que sonaba (se puede apagar; la preferencia se recuerda)
+- **Sugerencias "Porque escuchas..."** — Canciones parecidas a la actual para reproducir ya o agregar a la cola, y una fila "Mas como..." en Inicio
 - **Tendencias** — Grid de canciones en tendencia desde YouTube Music
 - **Jam Sessions** — Sesiones colaborativas en tiempo real:
   - Crea una sesion y comparte el codigo QR
@@ -107,19 +109,28 @@ src/app/
 │   ├── search-bar/       # Busqueda de canciones
 │   ├── search-results/   # Resultados de busqueda
 │   ├── playlist/         # Cola de reproduccion
-│   ├── trending-grid/    # Tendencias de YouTube
+│   ├── trending-grid/    # Tendencias y fila "Mas como..."
+│   ├── suggestions/      # Panel "Porque escuchas..." + interruptor de radio
 │   ├── jam-panel/        # Panel de sesion Jam (QR, participantes)
 │   └── jam-join/         # Dialog para unirse a Jam
 ├── services/
 │   ├── youtube.service.ts       # YouTube API
 │   ├── player-state.service.ts  # Estado global
+│   ├── radio.service.ts         # Sugerencias y radio automatica
+│   ├── queue.ts                 # Reglas de la cola (funciones puras + queue.spec.ts)
 │   ├── jam.service.ts           # Socket.IO / Jam
 │   └── proxy-url.ts             # URL del proxy
 └── models/
 
 server/
-├── proxy.js    # Express + Socket.IO + YouTube proxy
-└── tunnel.js   # Script de ngrok
+├── proxy.js             # Punto de entrada: Express + Socket.IO + build de Angular
+├── api.js               # Rutas /api (search, trending, video-info, related)
+├── youtube/
+│   ├── innertube.js     # Cliente InnerTube (sin API key, con timeout)
+│   ├── parsers.js       # Respuestas de YouTube -> Song[] (funciones puras)
+│   └── cache.js         # Cache en memoria con TTL
+├── jam/sessions.js      # Sesiones Jam en tiempo real
+└── tunnel.js            # Script de ngrok
 
 Dockerfile           # Multi-stage build (Angular + Node.js)
 .dockerignore        # Exclusiones para Docker build
@@ -134,7 +145,12 @@ docker-compose.yml   # Orquestacion con Docker Compose
 | `npm run proxy` | Servidor Express + Socket.IO (puerto 3001) |
 | `npm run build` | Build de produccion |
 | `npm run tunnel` | Tunnel ngrok para acceso remoto |
+| `npm test` | Pruebas unitarias del cliente (Vitest) y del servidor (`node:test`) |
+| `npm run test:unit` | Solo las pruebas del cliente |
+| `npm run test:server` | Solo las pruebas del servidor |
 | `npm run cy:open` | Abrir Cypress para tests E2E |
+
+La integracion continua (`.github/workflows/ci.yml`) corre `npm test` y el build en cada push y pull request.
 
 ## Licencia
 

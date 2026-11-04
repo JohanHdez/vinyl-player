@@ -13,3 +13,9 @@ Thumbs.db
 .DS_Store
 cypress
 __screenshots__
+
+# Pruebas y fixtures: no van a la imagen
+server/**/*.test.js
+server/**/__fixtures__
+src/**/*.spec.ts
+vitest.config.ts

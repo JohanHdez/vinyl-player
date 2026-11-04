@@ -10,6 +10,7 @@ import { Song } from '../../models/song.model';
   styleUrl: './trending-grid.component.scss',
 })
 export class TrendingGridComponent {
+  @Input() heading = 'Hits Mundiales';
   @Input() songs: Song[] = [];
   @Input() loading = false;
 

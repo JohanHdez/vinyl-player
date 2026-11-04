@@ -1,11 +1,24 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { Song } from '../models/song.model';
+import { nextIndex, prevIndex } from './queue';
+
+const AUTOPLAY_KEY = 'vinyl.autoplay';
+
+function readAutoplayPreference(): boolean {
+  try {
+    return localStorage.getItem(AUTOPLAY_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
 
 @Injectable({ providedIn: 'root' })
 export class PlayerStateService {
   private playlist: Song[] = [];
   private _currentIndex = -1;
+  /** Ids que ya sonaron en esta sesión: la radio no los repite. */
+  private readonly played = new Set<string>();
 
   readonly playlist$ = new BehaviorSubject<Song[]>([]);
   readonly currentIndex$ = new BehaviorSubject<number>(-1);
@@ -13,12 +26,16 @@ export class PlayerStateService {
   readonly isPlaying$ = new BehaviorSubject<boolean>(false);
   readonly shuffle$ = new BehaviorSubject<boolean>(false);
   readonly repeat$ = new BehaviorSubject<boolean>(false);
+  /** Radio automática: al acabarse la cola sigue con canciones parecidas. */
+  readonly autoplay$ = new BehaviorSubject<boolean>(readAutoplayPreference());
   readonly currentTime$ = new BehaviorSubject<number>(0);
   readonly duration$ = new BehaviorSubject<number>(0);
   readonly volume$ = new BehaviorSubject<number>(80);
 
   readonly playSong$ = new Subject<Song>();
   readonly toast$ = new Subject<string>();
+  /** Se emite cuando se pide la siguiente canción y la cola ya no tiene más. */
+  readonly queueEnded$ = new Subject<Song | null>();
 
   // Jam integration hooks - set by JamService
   suppressToast = false;
@@ -37,6 +54,10 @@ export class PlayerStateService {
     return this.playlist.length;
   }
 
+  get playedIds(): ReadonlySet<string> {
+    return this.played;
+  }
+
   addToPlaylist(song: Song): boolean {
     if (this.playlist.some(s => s.videoId === song.videoId)) {
       if (!this.suppressToast) this.toast$.next('Ya esta en la lista');
@@ -47,6 +68,17 @@ export class PlayerStateService {
     if (!this.suppressToast) this.toast$.next('Agregada a la lista');
     if (this.onSongAdded) this.onSongAdded(song);
     return true;
+  }
+
+  /** Agrega varias canciones sin un aviso por cada una. Devuelve cuántas entraron. */
+  addManyToPlaylist(songs: Song[]): number {
+    const previous = this.suppressToast;
+    this.suppressToast = true;
+    try {
+      return songs.filter(song => this.addToPlaylist(song)).length;
+    } finally {
+      this.suppressToast = previous;
+    }
   }
 
   removeFromPlaylist(index: number): void {
@@ -72,6 +104,7 @@ export class PlayerStateService {
     if (index < 0 || index >= this.playlist.length) return;
     this._currentIndex = index;
     const song = this.playlist[index];
+    this.played.add(song.videoId);
     this.currentIndex$.next(index);
     this.currentSong$.next(song);
     this.playSong$.next(song);
@@ -83,34 +116,27 @@ export class PlayerStateService {
     if (index < 0 || index >= this.playlist.length) return;
     this._currentIndex = index;
     const song = this.playlist[index];
+    this.played.add(song.videoId);
     this.currentIndex$.next(index);
     this.currentSong$.next(song);
   }
 
   playNext(): void {
-    if (this.playlist.length === 0) return;
-    let next: number;
-    if (this.shuffle$.value) {
-      next = Math.floor(Math.random() * this.playlist.length);
-    } else {
-      next = (this._currentIndex + 1) % this.playlist.length;
+    const next = nextIndex(this.playlist.length, this._currentIndex, { shuffle: this.shuffle$.value });
+    if (next === null) {
+      this.queueEnded$.next(this.currentSong$.value);
+      return;
     }
     this.play(next);
   }
 
   playPrev(): void {
-    if (this.playlist.length === 0) return;
     if (this.currentTime$.value > 3) {
       this.currentTime$.next(0);
       return;
     }
-    let prev: number;
-    if (this.shuffle$.value) {
-      prev = Math.floor(Math.random() * this.playlist.length);
-    } else {
-      prev = (this._currentIndex - 1 + this.playlist.length) % this.playlist.length;
-    }
-    this.play(prev);
+    const prev = prevIndex(this.playlist.length, this._currentIndex);
+    if (prev !== null) this.play(prev);
   }
 
   toggleShuffle(): void {
@@ -123,6 +149,16 @@ export class PlayerStateService {
     const val = !this.repeat$.value;
     this.repeat$.next(val);
     this.toast$.next(val ? 'Repetir activado' : 'Repetir desactivado');
+  }
+
+  setAutoplay(enabled: boolean): void {
+    this.autoplay$.next(enabled);
+    try {
+      localStorage.setItem(AUTOPLAY_KEY, enabled ? 'on' : 'off');
+    } catch {
+      // Sin almacenamiento (modo privado): la preferencia dura solo esta sesión.
+    }
+    this.toast$.next(enabled ? 'Radio automática activada' : 'Radio automática desactivada');
   }
 
   setVolume(vol: number): void {

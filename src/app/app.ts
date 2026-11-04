@@ -9,9 +9,11 @@ import { PlaylistComponent } from './components/playlist/playlist.component';
 import { TrendingGridComponent } from './components/trending-grid/trending-grid.component';
 import { JamPanelComponent } from './components/jam-panel/jam-panel.component';
 import { JamJoinComponent } from './components/jam-join/jam-join.component';
+import { SuggestionsComponent } from './components/suggestions/suggestions.component';
 import { YouTubeService } from './services/youtube.service';
 import { PlayerStateService } from './services/player-state.service';
 import { JamService } from './services/jam.service';
+import { RadioService } from './services/radio.service';
 import { Song } from './models/song.model';
 
 export type AppView = 'home' | 'search' | 'nowplaying' | 'library';
@@ -29,6 +31,7 @@ export type AppView = 'home' | 'search' | 'nowplaying' | 'library';
     TrendingGridComponent,
     JamPanelComponent,
     JamJoinComponent,
+    SuggestionsComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
@@ -65,19 +68,21 @@ export class App implements OnInit, OnDestroy {
     return song ? `https://i.ytimg.com/vi/${song.videoId}/mqdefault.jpg` : '';
   });
 
-  private toastTimeout: any;
+  private toastTimeout?: ReturnType<typeof setTimeout>;
   private subs: Subscription[] = [];
 
   constructor(
     private yt: YouTubeService,
     private state: PlayerStateService,
     private jamService: JamService,
+    readonly radio: RadioService,
     private appRef: ApplicationRef,
     private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
     this.yt.init();
+    this.radio.start();
     this.subs.push(
       this.state.isPlaying$.subscribe(p => {
         this.isPlaying.set(p);

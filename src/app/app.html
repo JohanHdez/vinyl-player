@@ -75,6 +75,14 @@
           <p class="view-subtitle">Musica en tendencia para ti</p>
         </div>
         <app-search-bar (search)="onSearch($event)"></app-search-bar>
+        @if (radio.seed() && radio.suggestions().length) {
+          <app-trending-grid
+            [heading]="'Más como «' + radio.seed()!.title + '»'"
+            [songs]="radio.suggestions().slice(0, 10)"
+            (addToPlaylist)="onAddToPlaylist($event)"
+            (playNow)="onPlayNow($event)">
+          </app-trending-grid>
+        }
         <app-trending-grid
           [songs]="trendingSongs()"
           [loading]="trendingLoading()"
@@ -129,6 +137,7 @@
           </div>
           <div class="nowplaying-right">
             <app-playlist></app-playlist>
+            <app-suggestions></app-suggestions>
           </div>
         </div>
       </div>

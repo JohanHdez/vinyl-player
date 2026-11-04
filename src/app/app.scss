@@ -373,6 +373,9 @@
 .nowplaying-right {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .nowplaying-info {
@@ -700,3 +703,6 @@
     padding: 56px 16px 20px;
   }
 }
+
+// Deja espacio para que el botón flotante de Jam no tape las sugerencias.
+.view-nowplaying { padding-bottom: 96px; }
