@@ -32,7 +32,8 @@ export class PlayerControlsComponent implements OnInit, OnDestroy {
   });
 
   controlsDisabled = computed(() =>
-    this.jam.isInSession() && !this.jam.isHost() && !this.jam.listenLocally()
+    // Los invitados nunca controlan la música de la sala (aunque la escuchen aquí).
+    this.jam.isInSession() && !this.jam.isHost()
   );
 
   hoverPercent = signal(0);

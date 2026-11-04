@@ -14,6 +14,7 @@ Reproductor de musica web con estetica de tocadiscos vintage. Busca y reproduce 
 - **Compartir por WhatsApp** — Enlace a una cancion (`?song=`) o a una sala (`?jam=`) con vista previa: titulo, artista y portada de la cancion
 - **Versiones bloqueadas** — Si YouTube no deja reproducir un video fuera de su sitio, busca otra version de la misma cancion y la pone en su lugar
 - **Votos** — Lo que se comparte en el chat entra a la cola; la canción más votada de las que esperan suena primero (a igualdad de votos, los pedidos van antes que la radio)
+- **Escuchar aquí** — Quien entra a una sala puede activar "🎧 Escuchar aquí" para oír la música también en su celular, sincronizada con el anfitrión (sigue sus cambios de canción, pausas y saltos; corrige desfases de más de 2 s)
 - **Salas** — Chat en tiempo real tipo Messenger: burbujas, "esta escribiendo...", reacciones, canciones compartidas como tarjetas con "Poner ahora" / "+ Cola", avisos de quien entra o agrega musica, historial para quien llega tarde y contador de no leidos
 - **Jam Sessions** — Sesiones colaborativas en tiempo real:
   - Crea una sesion y comparte el codigo QR

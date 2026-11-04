@@ -83,7 +83,7 @@
   <div class="room">
     <header class="room-header">
       <div class="room-title">
-        <span class="room-kicker">Sala · {{ jam.sessionCode() }} · {{ jam.isHost() ? 'eres el anfitrión' : 'tu celular es el control' }}</span>
+        <span class="room-kicker">Sala · {{ jam.sessionCode() }} · {{ jam.isHost() ? 'eres el anfitrión' : jam.listenHere() ? 'escuchas aquí y controlas desde tu celular' : 'tu celular es el control' }}</span>
         <h1 class="font-display">{{ jam.roomName() || 'Sala' }}</h1>
       </div>
       <div class="room-people" aria-label="Personas en la sala">
@@ -93,6 +93,12 @@
         <span class="room-count">{{ jam.participants().length }} en la sala</span>
       </div>
       <div class="room-actions">
+        @if (!jam.isHost()) {
+          <button type="button" class="room-btn listen-btn" [class.on]="jam.listenHere()" (click)="jam.setListenHere(!jam.listenHere())"
+                  [attr.aria-pressed]="jam.listenHere()" title="Escuchar la música de la sala también en este dispositivo">
+            🎧 {{ jam.listenHere() ? 'Escuchando aquí' : 'Escuchar aquí' }}
+          </button>
+        }
         <app-share-button [roomCode]="jam.sessionCode()" [nowPlaying]="nowPlaying()?.title" label="Invitar"></app-share-button>
         <button type="button" class="room-btn" (click)="backToRooms()">{{ jam.isHost() ? 'Mis salas' : 'Salir' }}</button>
       </div>

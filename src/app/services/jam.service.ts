@@ -11,6 +11,7 @@ import { PROXY_URL } from './proxy-url';
 const KEY_CURRENT = 'vinyl_jam_code';
 const KEY_NAME = 'vinyl_jam_name';
 const KEY_ROOMS = 'vinyl_my_rooms';
+const KEY_LISTEN = 'vinyl_listen_here';
 
 function readRooms(): MyRoom[] {
   try {
@@ -42,8 +43,15 @@ export class JamService {
 
   isInSession = signal(false);
   isHost = signal(false);
-  /** Solo el anfitrión reproduce audio. Se conserva por compatibilidad con los componentes. */
-  listenLocally = computed(() => this.isHost());
+  /**
+   * Invitado: además de ser control remoto, puede escuchar la sala en su
+   * dispositivo (con audífonos), sincronizado con el anfitrión. Por defecto no.
+   */
+  listenHere = signal(localStorage.getItem(KEY_LISTEN) === '1');
+  /** ¿Suena la música en este dispositivo? Anfitrión siempre; invitado si lo pidió. */
+  listenLocally = computed(() => this.isHost() || this.listenHere());
+  /** Último estado de reproducción conocido de la sala, para calcular por dónde va. */
+  private roomClock = { time: 0, playing: false, at: Date.now() };
   connected = signal(true);
   hostOnline = signal(true);
   sessionId = signal('');
@@ -149,7 +157,27 @@ export class JamService {
     }
   }
 
+  /** Activa o desactiva "escuchar aquí" (solo aplica a invitados). */
+  setListenHere(on: boolean): void {
+    this.listenHere.set(on);
+    localStorage.setItem(KEY_LISTEN, on ? '1' : '0');
+    if (!this.isInSession() || this.isHost()) return;
+    if (!on) {
+      this.yt.pause();
+      this.state.toast$.next('Listo: tu celular vuelve a ser solo control');
+      return;
+    }
+    const index = this.state.currentIndex;
+    if (index >= 0 && this.hostOnline()) {
+      this.followHere(index, this.roomTime(), this.roomClock.playing);
+      this.state.toast$.next('🎧 Escuchando la sala en este dispositivo');
+    } else {
+      this.state.toast$.next('🎧 Cuando suene algo en la sala, también lo escucharás aquí');
+    }
+  }
+
   leaveSession(): void {
+    if (this.isInSession() && !this.isHost() && this.listenHere()) this.yt.pause();
     this.stopSyncInterval();
     this.rejoinCode = '';
     if (this.socket) {
@@ -313,6 +341,33 @@ export class JamService {
     }
   }
 
+  /** ¿Este invitado está escuchando la sala en su dispositivo? */
+  private get hearsHere(): boolean {
+    return this.isInSession() && !this.isHost() && this.listenHere();
+  }
+
+  private setClock(time: number, playing: boolean): void {
+    this.roomClock = { time, playing, at: Date.now() };
+  }
+
+  /** Por dónde va la canción en la sala ahora mismo (estimado). */
+  private roomTime(): number {
+    const { time, playing, at } = this.roomClock;
+    return playing ? time + (Date.now() - at) / 1000 : time;
+  }
+
+  /** Invitado con audífonos: pone en su dispositivo lo que suena en la sala. */
+  private followHere(index: number, time: number, playing: boolean): void {
+    const song = this.state.playlist$.value[index];
+    if (!song) return;
+    this.yt.loadVideoThen(song.videoId, () => {
+      // El video tarda en cargar: calcula por dónde va la sala justo cuando ya puede sonar.
+      const at = playing ? Math.max(time, this.roomTime()) : time;
+      if (at > 1) this.yt.seekTo(at);
+      if (!playing) this.yt.pause();
+    });
+  }
+
   /** Aplica un cambio que viene de la sala sin reenviarlo. */
   private remote(fn: () => void): void {
     this.suppressEmit = true;
@@ -348,7 +403,10 @@ export class JamService {
 
     socket.on('session-joined', (data: RoomSnapshot) => this.enterRoom(data));
 
-    socket.on('host-status', (data: { online: boolean }) => this.hostOnline.set(data.online));
+    socket.on('host-status', (data: { online: boolean }) => {
+      this.hostOnline.set(data.online);
+      if (!data.online && this.hearsHere) this.yt.pause();
+    });
 
     for (const event of ['participant-joined', 'participant-left', 'participant-updated', 'participant-disconnected']) {
       socket.on(event, (data: { participants: JamParticipant[] }) => this.participants.set(data.participants));
@@ -383,41 +441,65 @@ export class JamService {
     socket.on('song-replaced', (data: { index: number; song: Song }) =>
       this.remote(() => {
         this.state.replaceSong(data.index, data.song);
-        if (data.index === this.state.currentIndex && this.isHost()) this.state.play(data.index);
+        if (data.index !== this.state.currentIndex) return;
+        if (this.isHost()) this.state.play(data.index);
+        else if (this.hearsHere) this.followHere(data.index, 0, true);
       })
     );
     socket.on('song-removed', (data: { index: number }) =>
       this.remote(() => this.state.removeFromPlaylist(data.index, { remote: true }))
     );
 
-    // ── Reproducción: el anfitrión reproduce; los invitados solo ven qué suena ──
+    // ── Reproducción: el anfitrión reproduce; los invitados ven qué suena y,
+    //    si activaron "escuchar aquí", lo siguen en su dispositivo ──
     socket.on('song-played', (data: { index: number }) =>
       this.remote(() => {
+        this.setClock(0, true);
         if (this.isHost()) {
           this.state.play(data.index);
-        } else {
-          this.state.setCurrentSongDisplay(data.index);
-          this.state.setPlaying(true);
+          return;
         }
+        this.state.setCurrentSongDisplay(data.index);
+        this.state.setPlaying(true);
+        if (this.hearsHere) this.followHere(data.index, 0, true);
       })
     );
     socket.on('song-paused', (data: { currentTime: number }) =>
       this.remote(() => {
+        this.setClock(data.currentTime, false);
+        if (this.hearsHere) this.yt.pause();
         this.state.updateTime(data.currentTime, this.state.duration$.value);
         this.state.setPlaying(false);
       })
     );
     socket.on('song-resumed', (data: { currentTime: number }) =>
       this.remote(() => {
+        this.setClock(data.currentTime, true);
+        if (this.hearsHere) {
+          this.yt.seekTo(data.currentTime);
+          this.yt.play();
+        }
         this.state.updateTime(data.currentTime, this.state.duration$.value);
         this.state.setPlaying(true);
       })
     );
     socket.on('song-seeked', (data: { currentTime: number }) =>
-      this.remote(() => this.state.updateTime(data.currentTime, this.state.duration$.value))
+      this.remote(() => {
+        this.setClock(data.currentTime, this.roomClock.playing);
+        if (this.hearsHere) this.yt.seekTo(data.currentTime);
+        this.state.updateTime(data.currentTime, this.state.duration$.value);
+      })
     );
     socket.on('playback-synced', (data: { currentTime: number; duration?: number; isPlaying: boolean }) => {
       if (this.isHost()) return;
+      this.setClock(data.currentTime, data.isPlaying);
+      if (this.hearsHere) {
+        // Corrige el desfase solo si pasa de 2 s, para no cortar el audio a cada rato.
+        if (Math.abs(this.yt.getCurrentTime() - data.currentTime) > 2) this.yt.seekTo(data.currentTime);
+        if (data.isPlaying && !this.state.isPlaying$.value) this.yt.play();
+        if (!data.isPlaying && this.state.isPlaying$.value) this.yt.pause();
+        return; // el reproductor local ya actualiza el tiempo y el estado
+      }
       this.state.updateTime(data.currentTime, data.duration || this.state.duration$.value);
       this.state.setPlaying(data.isPlaying);
     });
@@ -435,8 +517,10 @@ export class JamService {
             if (!data.isPlaying) this.yt.pause();
           });
         } else {
+          this.setClock(data.currentTime ?? 0, !!data.isPlaying);
           this.state.updateTime(data.currentTime ?? 0, data.duration ?? 0);
           this.state.setPlaying(!!data.isPlaying);
+          if (this.hearsHere) this.followHere(data.currentIndex, data.currentTime ?? 0, !!data.isPlaying);
         }
       })
     );

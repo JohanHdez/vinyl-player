@@ -106,7 +106,7 @@ docker-compose.yml           # Orquestacion con Docker Compose
 - `PlaybackRecoveryService` busca la misma cancion (`recovery.ts`: palabras clave + similitud >= 0.6), prueba hasta 4 versiones con `replaceSong` y avisa cual puso. En una sala solo el host reemplaza (evento `replace-song` / `song-replaced`).
 
 ### Salas v3 (reglas actuales)
-- Solo suena en el dispositivo del anfitrión; los invitados son control remoto (`state.guestMode`): `play()` queda como pedido y quitar está bloqueado.
+- Por defecto solo suena en el dispositivo del anfitrión. Un invitado puede activar "Escuchar aquí" (`JamService.listenHere`, localStorage `vinyl_listen_here`): sigue al anfitrión con `followHere` y `roomClock`, sin controlar nada (al terminar una canción espera la del anfitrión). Los invitados son control remoto (`state.guestMode`): `play()` queda como pedido y quitar está bloqueado.
 - El anfitrión tiene una `hostKey` (32 hex) que se guarda en "Mis salas" (localStorage `vinyl_my_rooms`); con ella vuelve con `rejoin-session`. El control NUNCA pasa a un invitado; si el anfitrión se va, `host-status {online:false}`.
 - Sin límite de salas por persona; cada conexión está en una a la vez (crear o entrar saca de la anterior).
 - La cola la ordena el servidor por votos (`jam/queue-order.js`) y la manda completa en `queue-updated` tras cada cambio. `share-song` también encola. `vote-song {videoId}` pone/quita voto.

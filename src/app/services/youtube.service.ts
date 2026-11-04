@@ -113,6 +113,8 @@ export class YouTubeService {
       }
       this.state.setPlaying(false);
       this.stopProgressUpdate();
+      // Invitado de una sala escuchando en su dispositivo: espera la siguiente del anfitrión.
+      if (this.state.guestMode) return;
       // Si la cola terminó, PlayerState avisa con queueEnded$ y la radio continúa.
       this.state.playNext();
     }

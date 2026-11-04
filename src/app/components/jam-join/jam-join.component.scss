@@ -194,3 +194,6 @@
 .join-explain { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45; margin-bottom: 6px; }
 .field-code { text-transform: uppercase; letter-spacing: 0.3em; font-weight: 600; }
 .join-terms { font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; a { color: var(--accent-bright); } }
+
+.join-listen { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-primary); margin-top: 6px; cursor: pointer; }
+.join-listen input { width: 18px; height: 18px; accent-color: var(--accent-brass); }

@@ -241,3 +241,6 @@
   background: rgba(196, 75, 63, 0.14); border: 1px solid rgba(196, 75, 63, 0.35);
   color: var(--text-primary); font-size: 0.85rem;
 }
+
+// Invitado: escuchar la sala también en su dispositivo
+.listen-btn.on { background: rgba(200, 152, 76, 0.18); border-color: var(--accent-brass); color: var(--accent-bright); }
