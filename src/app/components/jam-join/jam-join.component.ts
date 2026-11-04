@@ -1,18 +1,21 @@
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { JamService } from '../../services/jam.service';
+import { ListenChoiceComponent } from '../listen-choice/listen-choice.component';
 
 /** Diálogo que aparece al abrir un enlace de invitación (?jam=CÓDIGO). */
 @Component({
   selector: 'app-jam-join',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ListenChoiceComponent],
   templateUrl: './jam-join.component.html',
   styleUrl: './jam-join.component.scss',
 })
 export class JamJoinComponent implements OnInit {
   code = '';
   name = localStorage.getItem('vinyl_jam_name') ?? '';
+  /** Lo que eligió la última vez (por defecto: escuchar en la sala). */
+  listenHere = false;
 
   constructor(public jam: JamService) {}
 
@@ -23,11 +26,13 @@ export class JamJoinComponent implements OnInit {
   ngOnInit(): void {
     const pendingCode = this.jam.pendingJamCode();
     if (pendingCode) this.code = pendingCode;
+    this.listenHere = this.jam.listenHere();
   }
 
   join(): void {
     const c = this.code.trim().toUpperCase();
     if (!c) return;
+    this.jam.setListenHere(this.listenHere);
     this.jam.joinSession(c, this.name.trim() || 'Invitado');
     this.cleanUrl();
   }

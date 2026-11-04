@@ -7,7 +7,7 @@
       </div>
 
       <div class="dialog-body">
-        <p class="join-explain">La música suena en el dispositivo de quien creó la sala. Desde tu celular pides canciones, votas y chateas.</p>
+        <p class="join-explain">Desde tu celular pides canciones, votas y chateas.</p>
 
         <label class="field-label" for="join-name">Tu nombre</label>
         <input id="join-name" type="text" class="field-input" placeholder="¿Cómo te llamamos?" [(ngModel)]="name" maxlength="30" (keydown.enter)="join()" autofocus />
@@ -15,10 +15,7 @@
         <label class="field-label" for="join-code">Código de la sala</label>
         <input id="join-code" type="text" class="field-input field-code" placeholder="ABC123" [(ngModel)]="code" maxlength="6" (keydown.enter)="join()" />
 
-        <label class="join-listen">
-          <input type="checkbox" [checked]="jam.listenHere()" (change)="jam.setListenHere($any($event.target).checked)" />
-          🎧 Escuchar también en este dispositivo (con audífonos)
-        </label>
+        <app-listen-choice name="join-listen" [(here)]="listenHere"></app-listen-choice>
 
         <p class="join-terms">Al entrar aceptas los <a href="/?view=terminos" target="_blank" rel="noopener">términos de uso</a>.</p>
       </div>

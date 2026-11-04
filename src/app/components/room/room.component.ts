@@ -7,13 +7,14 @@ import { ChatComponent } from '../chat/chat.component';
 import { JamPanelComponent } from '../jam-panel/jam-panel.component';
 import { PlaylistComponent } from '../playlist/playlist.component';
 import { ShareButtonComponent } from '../share-button/share-button.component';
+import { ListenChoiceComponent } from '../listen-choice/listen-choice.component';
 
 const NAME_KEY = 'vinyl_jam_name';
 
 @Component({
   selector: 'app-room',
   standalone: true,
-  imports: [ChatComponent, JamPanelComponent, PlaylistComponent, ShareButtonComponent],
+  imports: [ChatComponent, JamPanelComponent, PlaylistComponent, ShareButtonComponent, ListenChoiceComponent],
   templateUrl: './room.component.html',
   styleUrl: './room.component.scss',
 })
@@ -26,6 +27,8 @@ export class RoomComponent implements OnInit, OnDestroy {
   readonly roomName = signal('');
   readonly code = signal(this.jam.pendingJamCode());
   readonly error = signal('');
+  /** ¿Dónde quiere escuchar quien se une? Por defecto, lo que eligió la última vez. */
+  listenHere = this.jam.listenHere();
   readonly mode = signal<'create' | 'join'>(this.jam.pendingJamCode() ? 'join' : 'create');
   readonly statuses = signal<Map<string, RoomStatus>>(new Map());
   readonly nowPlaying = toSignal(this.state.currentSong$);
@@ -98,6 +101,7 @@ export class RoomComponent implements OnInit, OnDestroy {
       this.error.set('El código tiene 6 letras o números.');
       return;
     }
+    this.jam.setListenHere(this.listenHere);
     this.jam.joinSession(code, name);
   }
 

@@ -68,8 +68,9 @@
           <span>Tu nombre</span>
           <input type="text" maxlength="30" placeholder="¿Cómo te llamamos?" [value]="name()" (input)="name.set($any($event.target).value)" />
         </label>
+        <app-listen-choice name="lobby-listen" [(here)]="listenHere"></app-listen-choice>
         <p class="fine">
-          Tu celular es el control: pide canciones, vota y chatea. La música suena en la sala.
+          Desde tu celular pides canciones, votas y chateas.
           Al entrar aceptas los <a href="/?view=terminos" target="_blank" rel="noopener">términos de uso</a>.
         </p>
         <button type="submit" class="room-btn room-btn--primary room-btn--big">Entrar</button>
@@ -95,8 +96,8 @@
       <div class="room-actions">
         @if (!jam.isHost()) {
           <button type="button" class="room-btn listen-btn" [class.on]="jam.listenHere()" (click)="jam.setListenHere(!jam.listenHere())"
-                  [attr.aria-pressed]="jam.listenHere()" title="Escuchar la música de la sala también en este dispositivo">
-            🎧 {{ jam.listenHere() ? 'Escuchando aquí' : 'Escuchar aquí' }}
+                  [attr.aria-pressed]="jam.listenHere()" title="Cambiar dónde escuchas: en la sala o también en tu celular">
+            {{ jam.listenHere() ? '🎧 Escuchando en mi celular' : '🔊 Escuchando en la sala' }}
           </button>
         }
         <app-share-button [roomCode]="jam.sessionCode()" [nowPlaying]="nowPlaying()?.title" label="Invitar"></app-share-button>
