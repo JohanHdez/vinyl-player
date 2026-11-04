@@ -24,9 +24,9 @@
   } @else {
     <div class="trending-grid">
       @for (song of songs; track song.videoId; let i = $index) {
-        <div class="trending-card" (click)="onPlay(song)" [style.animation-delay]="(i * 50) + 'ms'">
+        <div class="trending-card" role="button" tabindex="0" [attr.aria-label]="'Reproducir ' + song.title" (click)="onPlay(song)" (keydown.enter)="onPlay(song)" [style.animation-delay]="(i * 50) + 'ms'">
           <div class="card-thumb-wrap">
-            <img [src]="thumbUrl(song.videoId)" [alt]="song.title" class="card-thumb" loading="lazy">
+            <img [src]="thumbUrl(song.videoId)" alt="" class="card-thumb" loading="lazy">
             <div class="card-overlay">
               <div class="play-circle">
                 <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
@@ -38,7 +38,7 @@
             <div class="card-title">{{ song.title }}</div>
             <div class="card-meta">
               <span class="card-channel">{{ song.channel }}</span>
-              <button class="card-add-btn" (click)="onAdd($event, song)" title="Agregar a lista">
+              <button class="card-add-btn" (click)="onAdd($event, song)" title="Agregar a la cola" [attr.aria-label]="'Agregar ' + song.title + ' a la cola'">
                 <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
               </button>
             </div>

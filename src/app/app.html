@@ -1,12 +1,4 @@
-<div class="app-shell" [class.sidebar-collapsed]="sidebarCollapsed()" [class.has-player]="hasSong()" [class.mobile-menu-open]="mobileMenuOpen()">
-
-  <!-- ═══ MOBILE HAMBURGER ═══ -->
-  <button class="mobile-hamburger" (click)="mobileMenuOpen.set(true)">
-    <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
-  </button>
-
-  <!-- ═══ MOBILE OVERLAY ═══ -->
-  <div class="mobile-overlay" (click)="mobileMenuOpen.set(false)"></div>
+<div class="app-shell" [class.sidebar-collapsed]="sidebarCollapsed()" [class.has-player]="hasSong()" [class.np-open]="currentView() === 'nowplaying'">
 
   <!-- ═══ SIDEBAR ═══ -->
   <aside class="sidebar">
@@ -57,7 +49,7 @@
       <!-- Sidebar collapse toggle -->
       <button type="button" class="sidebar-terms" (click)="setView('terms')">Términos y privacidad</button>
 
-      <button class="sidebar-toggle" (click)="toggleSidebar()">
+      <button class="sidebar-toggle" (click)="toggleSidebar()" [attr.aria-label]="sidebarCollapsed() ? 'Expandir menú' : 'Contraer menú'">
         <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
       </button>
 
@@ -85,7 +77,7 @@
       <div class="view-pane view-home">
         <div class="view-header">
           <h1 class="view-title font-display">Descubre</h1>
-          <p class="view-subtitle">Musica en tendencia para ti</p>
+          <p class="view-subtitle">Música en tendencia para ti</p>
         </div>
         <app-search-bar (search)="onSearch($event)"></app-search-bar>
         @if (radio.seed() && radio.suggestions().length) {
@@ -102,6 +94,7 @@
           (addToPlaylist)="onAddToPlaylist($event)"
           (playNow)="onPlayNow($event)">
         </app-trending-grid>
+        <button type="button" class="terms-link" (click)="setView('terms')">Términos y privacidad</button>
       </div>
     }
 
@@ -165,6 +158,8 @@
                 <p class="nowplaying-artist">{{ currentSong()?.channel }}</p>
                 <app-share-button class="nowplaying-share" [song]="currentSong()" label="Compartir canción"></app-share-button>
               </div>
+              <!-- En el celular, los controles completos (con barra de avance) viven aquí -->
+              <app-player-controls class="np-controls" layout="full"></app-player-controls>
             }
             @if (jamActive()) {
               <app-jam-panel></app-jam-panel>
@@ -183,9 +178,10 @@
       <div class="view-pane view-library">
         <div class="view-header">
           <h1 class="view-title font-display">Tu Biblioteca</h1>
-          <p class="view-subtitle">Tu coleccion personal de musica</p>
+          <p class="view-subtitle">Tu colección personal de música</p>
         </div>
         <app-playlist></app-playlist>
+        <button type="button" class="terms-link" (click)="setView('terms')">Términos y privacidad</button>
       </div>
     }
   </main>
@@ -193,7 +189,7 @@
 
 <!-- ═══ BOTTOM PLAYER BAR ═══ -->
 @if (hasSong()) {
-  <div class="bottom-bar">
+  <div class="bottom-bar" [class.np-open]="currentView() === 'nowplaying'">
     <div class="bottom-bar-progress"
          (click)="onBarProgressClick($event)"
          (mousemove)="onBarProgressHover($event)"
@@ -205,7 +201,7 @@
         </div>
       }
     </div>
-    <app-player-controls></app-player-controls>
+    <app-player-controls (openNowPlaying)="setView('nowplaying')"></app-player-controls>
   </div>
 }
 
@@ -216,13 +212,27 @@
   </button>
 }
 
+<!-- ═══ PESTAÑAS (celular) ═══ -->
+<nav class="tabbar" aria-label="Secciones">
+  @for (t of tabs; track t.view) {
+    <button type="button" class="tabbar-item" [class.active]="currentView() === t.view"
+            [attr.aria-current]="currentView() === t.view ? 'page' : null" (click)="setView(t.view)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="t.icon"/></svg>
+      <span>{{ t.label }}</span>
+      @if (t.view === 'room' && unread() > 0) {
+        <span class="tabbar-badge" [attr.aria-label]="unread() + ' mensajes sin leer'">{{ unread() > 9 ? '9+' : unread() }}</span>
+      }
+    </button>
+  }
+</nav>
+
 <!-- Hidden YouTube Player -->
 <div id="yt-player-container">
   <div id="yt-player"></div>
 </div>
 
 <!-- Toast -->
-<div class="toast" [class.show]="toastVisible()">{{ toastMessage() }}</div>
+<div class="toast" [class.show]="toastVisible()" role="status" aria-live="polite">{{ toastMessage() }}</div>
 
 <!-- Jam Join Dialog -->
 <app-jam-join></app-jam-join>

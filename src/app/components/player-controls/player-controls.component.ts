@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, OnDestroy, Output, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { PlayerStateService } from '../../services/player-state.service';
@@ -14,6 +14,18 @@ import { Song } from '../../models/song.model';
   styleUrl: './player-controls.component.scss',
 })
 export class PlayerControlsComponent implements OnInit, OnDestroy {
+  /** 'bar': mini reproductor de abajo. 'full': controles grandes con barra de avance. */
+  @Input() layout: 'bar' | 'full' = 'bar';
+  /** Tocaron el nombre de la canción: abrir la vista "Tocando". */
+  @Output() openNowPlaying = new EventEmitter<void>();
+
+  /** Mientras se arrastra la barra, muestra ese punto en vez del tiempo real. */
+  private readonly scrub = signal<number | null>(null);
+  readonly sliderValue = computed(() => this.scrub() ?? this.currentTime());
+  readonly sliderPercent = computed(() =>
+    this.duration() > 0 ? Math.min(100, (this.sliderValue() / this.duration()) * 100) : 0
+  );
+
   currentSong = signal<Song | null>(null);
   isPlaying = signal(false);
   shuffle = signal(false);
@@ -131,6 +143,18 @@ export class PlayerControlsComponent implements OnInit, OnDestroy {
 
   onProgressLeave(): void {
     this.showHoverTooltip.set(false);
+  }
+
+  onScrub(event: Event): void {
+    this.scrub.set(+(event.target as HTMLInputElement).value);
+  }
+
+  onSeek(event: Event): void {
+    const time = +(event.target as HTMLInputElement).value;
+    this.scrub.set(null);
+    if (this.controlsDisabled() || !this.duration()) return;
+    this.yt.seekTo(time);
+    if (this.state.onSeeked) this.state.onSeeked(time);
   }
 
   onVolumeChange(event: Event): void {

@@ -11,7 +11,7 @@
       @if (m.type === 'system') {
         <p class="msg-system">{{ m.text }} · {{ time(m.ts) }}</p>
       } @else {
-        <div class="msg" [class.mine]="m.mine" [class.grouped]="!m.firstOfGroup">
+        <div class="msg" [class.mine]="m.mine" [class.grouped]="!m.firstOfGroup" [class.reacting]="reactingTo() === m.id">
           @if (!m.mine) {
             <span class="msg-avatar" [style.background]="color(m.author)" [class.hidden]="!m.firstOfGroup" aria-hidden="true">{{ initial(m.author) }}</span>
           }
@@ -21,7 +21,7 @@
               <span class="msg-author">{{ m.author }}</span>
             }
 
-            <div class="bubble" [class.bubble--song]="m.type === 'song'">
+            <div class="bubble" [class.bubble--song]="m.type === 'song'" (click)="toggleReact($event, m.id)">
               @if (m.type === 'song' && m.song; as song) {
                 <div class="song-card">
                   <img [src]="thumb(song.videoId)" alt="" loading="lazy" />

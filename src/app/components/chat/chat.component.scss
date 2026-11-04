@@ -320,3 +320,21 @@
 }
 
 .song-actions .vote.voted { border-color: var(--accent-bright); background: rgba(200, 152, 76, 0.25); }
+
+// Pantallas táctiles: las reacciones aparecen debajo del mensaje al tocarlo, nunca encima del texto.
+@media (hover: none) {
+  .react-picker { display: none; }
+  .msg.reacting { flex-wrap: wrap; }
+  .msg.reacting .react-picker {
+    display: flex;
+    flex-wrap: wrap;
+    position: static;
+    flex-basis: 100%;
+    margin-top: 6px;
+    opacity: 1;
+    pointer-events: auto;
+    box-shadow: none;
+    button { font-size: 1.25rem; }
+  }
+  .reaction { min-height: 36px; }
+}

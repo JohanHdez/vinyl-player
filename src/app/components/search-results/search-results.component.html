@@ -13,13 +13,13 @@
 
     <div class="search-results">
       @for (song of results; track song.videoId) {
-        <div class="result-item" (click)="onPlay(song)">
+        <div class="result-item" role="button" tabindex="0" [attr.aria-label]="'Reproducir ' + song.title" (click)="onPlay(song)" (keydown.enter)="onPlay(song)">
           <img class="result-thumb" [src]="thumbUrl(song.videoId)" alt="" loading="lazy">
           <div class="result-info">
             <div class="result-title">{{ song.title }}</div>
             <div class="result-channel">{{ song.channel }}</div>
           </div>
-          <button class="result-add-btn" (click)="onAdd($event, song)" title="Agregar a la lista">+</button>
+          <button class="result-add-btn" (click)="onAdd($event, song)" title="Agregar a la cola" [attr.aria-label]="'Agregar ' + song.title + ' a la cola'">+</button>
         </div>
       }
       @if (!loading && results.length === 0) {

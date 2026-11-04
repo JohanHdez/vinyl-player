@@ -24,6 +24,15 @@ import { Song } from './models/song.model';
 
 export type AppView = 'home' | 'explore' | 'search' | 'nowplaying' | 'library' | 'room' | 'terms';
 
+/** Pestañas de la barra inferior en el celular. */
+const TABS: { view: AppView; label: string; icon: string }[] = [
+  { view: 'home', label: 'Inicio', icon: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z' },
+  { view: 'explore', label: 'Explorar', icon: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm-5.5-2.5 7.51-3.49L17.5 6.5 9.99 9.99 6.5 17.5zm5.5-6.6a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2z' },
+  { view: 'search', label: 'Buscar', icon: 'M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z' },
+  { view: 'library', label: 'Biblioteca', icon: 'M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z' },
+  { view: 'room', label: 'Salas', icon: 'M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12zM7 9h10v2H7zm0-3h10v2H7zm0 6h7v2H7z' },
+];
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -65,7 +74,7 @@ export class App implements OnInit, OnDestroy {
   // View management
   currentView = signal<AppView>('home');
   sidebarCollapsed = signal(false);
-  mobileMenuOpen = signal(false);
+  readonly tabs = TABS;
 
   // Top progress bar
   currentTime = signal(0);
@@ -130,7 +139,6 @@ export class App implements OnInit, OnDestroy {
 
   setView(view: AppView): void {
     this.currentView.set(view);
-    this.mobileMenuOpen.set(false);
   }
 
   toggleSidebar(): void {

@@ -239,3 +239,11 @@
   &.voted { background: rgba(200, 152, 76, 0.18); border-color: var(--accent-brass); span { color: var(--accent-bright); } }
   &:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
 }
+
+// Una sola línea por dato: así los botones de votar y quitar nunca aprietan el texto.
+.pl-channel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 768px) {
+  .pl-title { font-size: 0.9rem; }
+  .pl-channel { font-size: 0.78rem; }
+  .pl-vote { margin-left: 4px; padding: 0 12px; }
+}

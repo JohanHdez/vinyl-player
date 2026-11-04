@@ -260,3 +260,11 @@
     border-color: rgba(196, 75, 63, 0.25);
   }
 }
+
+// Celular: el panel de la sala ocupa todo el ancho.
+@media (max-width: 960px) {
+  .jam-panel { max-width: none; }
+}
+
+.copy-btn { align-items: center; justify-content: center; }
+.jam-code-section { align-items: center; }

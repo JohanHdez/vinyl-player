@@ -16,12 +16,14 @@
   --accent-gradient: linear-gradient(135deg, #C44B3F, #C8984C);
 
   --text-primary: #EDE4D6;
-  --text-secondary: #8E7E6D;
-  --text-tertiary: #4D4039;
+  /* Contraste AA sobre el fondo oscuro (≥ 4.5:1) */
+  --text-secondary: #A39280;
+  --text-tertiary: #8A7A6C;
 
   --sidebar-width: 230px;
   --sidebar-collapsed: 68px;
   --player-height: 84px;
+  --tabbar-h: 0px;
 
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -173,4 +175,107 @@ body::after {
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* ═══════════════════════════════════════
+   CELULAR: navegación por pestañas y todo cómodo de tocar
+   ═══════════════════════════════════════ */
+.tabbar,
+.terms-link,
+.np-controls { display: none; }
+
+@media (max-width: 768px) {
+  :root {
+    --tabbar-h: 60px;
+    --player-height: 64px;
+  }
+
+  .tabbar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 110;
+    height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+    padding: 0 4px env(safe-area-inset-bottom, 0px);
+    background: #0b0907;
+    border-top: 1px solid rgba(200, 152, 76, 0.14);
+  }
+
+  .tabbar-item {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 0.7rem;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+
+    svg { width: 24px; height: 24px; fill: currentColor; }
+    &.active { color: var(--accent-bright); font-weight: 600; }
+    &:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: -4px; border-radius: 12px; }
+  }
+
+  .tabbar-badge {
+    position: absolute;
+    top: 5px;
+    left: calc(50% + 6px);
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--accent-red);
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+  }
+
+  .np-controls { display: block; width: 100%; }
+
+  .terms-link {
+    display: block;
+    margin: 36px auto 8px;
+    padding: 0 12px;
+    border: 0;
+    background: none;
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 0.82rem;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  /* Objetivos táctiles de al menos 44 × 44 px (WCAG / Apple / Google). */
+  button,
+  [role='button'],
+  select { min-height: 44px; min-width: 44px; }
+
+  /* 16 px evita que el iPhone haga zoom al escribir. */
+  input[type='text'],
+  input[type='search'],
+  input:not([type]),
+  textarea { min-height: 44px; font-size: 16px !important; }
+}
+
+/* Pantallas táctiles: lo que en el computador aparece al pasar el mouse, aquí se ve siempre. */
+@media (hover: none) {
+  .result-add-btn,
+  .card-add-btn,
+  .sg-add,
+  .pl-remove { opacity: 1 !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }

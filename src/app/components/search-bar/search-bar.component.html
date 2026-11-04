@@ -5,7 +5,8 @@
       #input
       type="search"
       class="search-input"
-      placeholder="Busca una canción, un artista o pega un enlace de YouTube"
+      placeholder="Canción, artista o enlace"
+      aria-label="Buscar una canción, un artista o pegar un enlace de YouTube"
       aria-label="Buscar música"
       [value]="query()"
       (input)="onInput($any($event.target).value)"

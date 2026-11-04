@@ -95,9 +95,10 @@
       </div>
       <div class="room-actions">
         @if (!jam.isHost()) {
-          <button type="button" class="room-btn listen-btn" [class.on]="jam.listenHere()" (click)="jam.setListenHere(!jam.listenHere())"
+          <button type="button" class="room-btn listen-btn" [class.on]="jam.listenHere()" (click)="jam.setListenHere(!jam.listenHere())" [attr.aria-label]="jam.listenHere() ? 'Escuchando en mi celular. Tocar para escuchar solo en la sala' : 'Escuchando en la sala. Tocar para escuchar también en mi celular'"
                   [attr.aria-pressed]="jam.listenHere()" title="Cambiar dónde escuchas: en la sala o también en tu celular">
-            {{ jam.listenHere() ? '🎧 Escuchando en mi celular' : '🔊 Escuchando en la sala' }}
+            <span class="label-long">{{ jam.listenHere() ? '🎧 Escuchando en mi celular' : '🔊 Escuchando en la sala' }}</span>
+            <span class="label-short" aria-hidden="true">{{ jam.listenHere() ? '🎧 Celular' : '🔊 Sala' }}</span>
           </button>
         }
         <app-share-button [roomCode]="jam.sessionCode()" [nowPlaying]="nowPlaying()?.title" label="Invitar"></app-share-button>

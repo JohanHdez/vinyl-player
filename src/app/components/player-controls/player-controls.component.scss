@@ -296,82 +296,92 @@
   }
 }
 
+// Celular: mini reproductor simple. Portada + nombre (abre "Tocando") + reproducir + siguiente.
 @media (max-width: 768px) {
-  .bar-layout {
-    gap: 8px;
-  }
-
-  .bar-thumb {
-    width: 40px;
-    height: 40px;
-  }
-
-  .bar-info {
-    flex: 1 1 0;
-    min-width: 60px;
-  }
-
-  .bar-progress {
-    display: none;
-  }
-
-  .bar-volume {
-    display: none;
-  }
-
-  .ctrl-btn svg {
-    width: 16px;
-    height: 16px;
-  }
-
-  .play-btn {
-    width: 36px;
-    height: 36px;
-
-    svg {
-      width: 18px;
-      height: 18px;
-    }
-  }
-}
-
-@media (max-width: 480px) {
-  .bar-layout {
-    gap: 6px;
-  }
-
-  .bar-info {
-    flex: 1 1 0;
-    min-width: 40px;
-
-    .song-title {
-      font-size: 0.78rem;
-    }
-    .song-artist {
-      font-size: 0.65rem;
-    }
-  }
-
-  .bar-controls {
-    gap: 4px;
-  }
-
-  .ctrl-btn {
-    padding: 2px;
-  }
-
-  .play-btn {
-    width: 34px;
-    height: 34px;
-  }
-}
-
-// Celular: que nada se salga de la pantalla.
-@media (max-width: 600px) {
-  .bar-info { min-width: 0; }
-  // Aleatorio y repetir son los menos usados: se ocultan para que quepan los principales.
-  .bar-controls .ctrl-btn:first-child,
-  .bar-controls .ctrl-btn:last-child { display: none; }
+  .bar-layout { gap: 10px; }
+  .bar-thumb { width: 44px; height: 44px; }
+  .bar-info { flex: 1 1 auto; min-width: 0; }
+  .bar-progress,
+  .bar-volume,
+  .bar-controls .ctrl-btn:not(.ctrl-next) { display: none; }
+  .bar-controls { gap: 2px; }
+  .ctrl-btn,
+  .play-btn { width: 48px; height: 48px; }
+  .ctrl-btn svg,
+  .play-btn svg { width: 24px; height: 24px; }
   // Invitado de una sala: no controla la música, solo ve qué suena.
   .controls-disabled .bar-controls { display: none; }
+}
+
+// ── Controles completos ("Tocando" en el celular) ──
+.full-layout { width: 100%; max-width: 420px; margin: 0 auto; }
+
+.full-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 44px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+
+  &::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent-brass) var(--pct, 0%), rgba(200, 152, 76, 0.18) var(--pct, 0%));
+  }
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    margin-top: -7px;
+    border-radius: 50%;
+    background: var(--accent-bright);
+  }
+  &::-moz-range-track { height: 4px; border-radius: 2px; background: rgba(200, 152, 76, 0.18); }
+  &::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent-brass); }
+  &::-moz-range-thumb { width: 18px; height: 18px; border: 0; border-radius: 50%; background: var(--accent-bright); }
+  &:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; border-radius: 8px; }
+  &:disabled { cursor: default; opacity: 0.6; }
+}
+
+.full-times {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -6px;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.full-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+
+  .ctrl-btn { width: 52px; height: 52px; svg { width: 26px; height: 26px; } }
+  .play-btn { width: 68px; height: 68px; svg { width: 32px; height: 32px; } }
+  .ctrl-btn:disabled,
+  .play-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+}
+
+.full-note {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+button.bar-info {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  .song-title, .song-artist { display: block; }
 }

@@ -249,3 +249,10 @@
     gap: 12px;
   }
 }
+
+@media (max-width: 768px) {
+  .card-meta { gap: 8px; margin-top: 4px; }
+  .card-title { font-size: 0.88rem; }
+  .card-channel { font-size: 0.78rem; }
+  .card-add-btn { border-color: rgba(200, 152, 76, 0.25); color: var(--text-primary); }
+}

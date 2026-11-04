@@ -137,3 +137,12 @@
   font-size: 0.85rem;
   font-weight: 400;
 }
+
+@media (max-width: 768px) {
+  .search-results { max-height: none; }
+  .result-item { padding: 10px 12px 10px 16px; min-height: 64px; }
+  .result-thumb { width: 64px; height: 48px; }
+  .result-title { font-size: 0.92rem; }
+  .result-channel { font-size: 0.8rem; }
+  .result-add-btn { border-color: rgba(200, 152, 76, 0.25); font-size: 1.4rem; }
+}

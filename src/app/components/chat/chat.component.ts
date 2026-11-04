@@ -28,6 +28,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   readonly reactions = REACTIONS;
   readonly draft = signal('');
+  /** En el celular: mensaje al que se le están mostrando las reacciones (al tocarlo). */
+  readonly reactingTo = signal<string | null>(null);
   readonly pickerOpen = signal(false);
   readonly pickerQuery = signal('');
   readonly pickerResults = signal<Song[]>([]);
@@ -161,7 +163,13 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     if (idx >= 0) this.state.play(idx);
   }
 
+  toggleReact(event: Event, id: string): void {
+    if ((event.target as HTMLElement).closest('button, a')) return;
+    this.reactingTo.update(current => (current === id ? null : id));
+  }
+
   react(message: ChatMessage, emoji: Reaction): void {
+    this.reactingTo.set(null);
     this.jam.react(message.id, emoji);
   }
 

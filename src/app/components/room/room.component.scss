@@ -244,3 +244,19 @@
 
 // Invitado: escuchar la sala también en su dispositivo
 .listen-btn.on { background: rgba(200, 152, 76, 0.18); border-color: var(--accent-brass); color: var(--accent-bright); }
+
+// Celular: cabecera compacta (nombre + acciones en una fila); las personas se ven en la pestaña Sala.
+@media (max-width: 960px) {
+  .room-header { flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+  .room-title { flex: 1 1 140px; min-width: 0; }
+  .room-title h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .room-kicker { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .room-people { display: none; }
+  .room-actions { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .room-btn { padding: 0 16px; }
+  .listen-btn .label-long { display: none; }
+  .listen-btn .label-short { display: inline; }
+  .room-tabs button { min-height: 44px; }
+}
+
+.label-short { display: none; }
