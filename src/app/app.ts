@@ -13,6 +13,7 @@ import { SuggestionsComponent } from './components/suggestions/suggestions.compo
 import { ExploreComponent } from './components/explore/explore.component';
 import { RoomComponent } from './components/room/room.component';
 import { ShareButtonComponent } from './components/share-button/share-button.component';
+import { TermsComponent } from './components/terms/terms.component';
 import { songIdFromSearch } from './services/share';
 import { YouTubeService } from './services/youtube.service';
 import { PlayerStateService } from './services/player-state.service';
@@ -21,7 +22,7 @@ import { RadioService } from './services/radio.service';
 import { PlaybackRecoveryService } from './services/playback-recovery.service';
 import { Song } from './models/song.model';
 
-export type AppView = 'home' | 'explore' | 'search' | 'nowplaying' | 'library' | 'room';
+export type AppView = 'home' | 'explore' | 'search' | 'nowplaying' | 'library' | 'room' | 'terms';
 
 @Component({
   selector: 'app-root',
@@ -40,6 +41,7 @@ export type AppView = 'home' | 'explore' | 'search' | 'nowplaying' | 'library' |
     ExploreComponent,
     RoomComponent,
     ShareButtonComponent,
+    TermsComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
@@ -49,6 +51,8 @@ export class App implements OnInit, OnDestroy {
   currentSong = signal<Song | null>(null);
   hasSong = computed(() => this.currentSong() !== null);
   searchResults = signal<Song[]>([]);
+  /** Última búsqueda, para que la vista Buscar continúe lo que se escribía en Inicio. */
+  lastQuery = signal('');
   searchLoading = signal(false);
   searchVisible = signal(false);
   trendingSongs = signal<Song[]>([]);
@@ -115,6 +119,7 @@ export class App implements OnInit, OnDestroy {
     );
     this.loadInitialContent();
     void this.openSharedSong();
+    if (new URLSearchParams(location.search).get('view') === 'terminos') this.currentView.set('terms');
     this.jamService.checkUrlForJam();
     this.jamService.attemptRejoin();
   }
@@ -145,6 +150,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   async onSearch(query: string): Promise<void> {
+    this.lastQuery.set(query);
     const videoId = this.yt.extractVideoId(query);
     if (videoId) {
       this.searchLoading.set(true);

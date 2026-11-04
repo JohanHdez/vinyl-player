@@ -1,31 +1,80 @@
 @if (!jam.isInSession()) {
-  <!-- ═══ PORTADA: crear o unirse ═══ -->
+  <!-- ═══ PORTADA ═══ -->
   <div class="view-header">
     <h1 class="view-title font-display">Salas</h1>
-    <p class="view-subtitle">Escucha con tus amigos, chatea y armen la cola entre todos, en tiempo real</p>
+    <p class="view-subtitle">La música suena en un solo lugar. Los demás piden canciones, votan y chatean desde su celular.</p>
   </div>
 
   <div class="lobby">
-    <label class="lobby-name">
-      <span>Tu nombre</span>
-      <input type="text" maxlength="30" placeholder="¿Cómo te llamamos?" [value]="name()" (input)="name.set($any($event.target).value)" />
-    </label>
+    @if (jam.myRooms().length) {
+      <section class="my-rooms" aria-labelledby="my-rooms-title">
+        <h2 id="my-rooms-title" class="lobby-heading">Mis salas</h2>
+        <ul>
+          @for (r of jam.myRooms(); track r.code) {
+            <li class="my-room">
+              <div class="my-room-info">
+                <strong>{{ r.name }}</strong>
+                <span>
+                  {{ r.code }}
+                  @if (status(r.code); as s) {
+                    @if (!s.exists) { · ya no existe }
+                    @else { · {{ s.people }} {{ s.people === 1 ? 'persona' : 'personas' }}{{ s.hostOnline ? ' · sonando en otro dispositivo' : '' }} }
+                  }
+                </span>
+              </div>
+              @if (status(r.code)?.exists !== false) {
+                <button type="button" class="room-btn room-btn--primary" (click)="open(r.code)">Abrir</button>
+              }
+              <button type="button" class="room-btn room-btn--ghost" (click)="forget(r.code)" [attr.aria-label]="'Quitar ' + r.name + ' de mis salas'">Quitar</button>
+            </li>
+          }
+        </ul>
+      </section>
+    }
 
-    <div class="lobby-cards">
-      <form class="lobby-card" (submit)="$event.preventDefault(); create()">
-        <span class="lobby-icon" aria-hidden="true">＋</span>
-        <h2 class="font-display">Crear una sala</h2>
-        <p>Tú pones la música. Comparte el código o el QR y la gente entra a conversar y sumar canciones.</p>
-        <button type="submit" class="room-btn room-btn--primary">Crear sala</button>
-      </form>
-
-      <form class="lobby-card" (submit)="$event.preventDefault(); join()">
-        <span class="lobby-icon" aria-hidden="true">→</span>
-        <h2 class="font-display">Unirme con un código</h2>
-        <input class="lobby-code" type="text" maxlength="6" placeholder="ABC123" [value]="code()" (input)="code.set($any($event.target).value)" aria-label="Código de la sala" />
-        <button type="submit" class="room-btn">Entrar</button>
-      </form>
+    <div class="lobby-tabs" role="tablist">
+      <button type="button" role="tab" [attr.aria-selected]="mode() === 'create'" [class.active]="mode() === 'create'" (click)="mode.set('create')">Crear una sala</button>
+      <button type="button" role="tab" [attr.aria-selected]="mode() === 'join'" [class.active]="mode() === 'join'" (click)="mode.set('join')">Unirme con un código</button>
     </div>
+
+    @if (mode() === 'create') {
+      <form class="lobby-card" (submit)="$event.preventDefault(); create()">
+        <label class="field">
+          <span>Nombre de la sala</span>
+          <input type="text" maxlength="40" placeholder="Ej: Gym · mañana" [value]="roomName()" (input)="roomName.set($any($event.target).value)" />
+        </label>
+        <div class="ideas" aria-label="Ideas de nombre">
+          @for (idea of ideas; track idea) {
+            <button type="button" class="idea" [class.active]="roomName() === idea" (click)="roomName.set(idea)">{{ idea }}</button>
+          }
+        </div>
+        <label class="field">
+          <span>Tu nombre</span>
+          <input type="text" maxlength="30" placeholder="¿Cómo te llamamos?" [value]="name()" (input)="name.set($any($event.target).value)" />
+        </label>
+        <p class="fine">
+          Puedes crear todas las salas que quieras. La música sonará en <strong>este dispositivo</strong>; conéctalo a los parlantes.
+          Al crearla aceptas los <a href="/?view=terminos" target="_blank" rel="noopener">términos de uso</a>.
+        </p>
+        <button type="submit" class="room-btn room-btn--primary room-btn--big">Crear sala</button>
+      </form>
+    } @else {
+      <form class="lobby-card" (submit)="$event.preventDefault(); join()">
+        <label class="field">
+          <span>Código de la sala</span>
+          <input class="code-input" type="text" maxlength="6" placeholder="ABC123" [value]="code()" (input)="code.set($any($event.target).value)" />
+        </label>
+        <label class="field">
+          <span>Tu nombre</span>
+          <input type="text" maxlength="30" placeholder="¿Cómo te llamamos?" [value]="name()" (input)="name.set($any($event.target).value)" />
+        </label>
+        <p class="fine">
+          Tu celular es el control: pide canciones, vota y chatea. La música suena en la sala.
+          Al entrar aceptas los <a href="/?view=terminos" target="_blank" rel="noopener">términos de uso</a>.
+        </p>
+        <button type="submit" class="room-btn room-btn--primary room-btn--big">Entrar</button>
+      </form>
+    }
 
     @if (error()) { <p class="lobby-error" role="alert">{{ error() }}</p> }
   </div>
@@ -33,9 +82,9 @@
   <!-- ═══ DENTRO DE LA SALA ═══ -->
   <div class="room">
     <header class="room-header">
-      <div>
-        <span class="room-kicker">Sala</span>
-        <h1 class="font-display">{{ jam.sessionCode() }}</h1>
+      <div class="room-title">
+        <span class="room-kicker">Sala · {{ jam.sessionCode() }} · {{ jam.isHost() ? 'eres el anfitrión' : 'tu celular es el control' }}</span>
+        <h1 class="font-display">{{ jam.roomName() || 'Sala' }}</h1>
       </div>
       <div class="room-people" aria-label="Personas en la sala">
         @for (p of jam.participants().slice(0, 5); track p.id) {
@@ -45,15 +94,21 @@
       </div>
       <div class="room-actions">
         <app-share-button [roomCode]="jam.sessionCode()" [nowPlaying]="nowPlaying()?.title" label="Invitar"></app-share-button>
-        <button type="button" class="room-btn" (click)="leave()">Salir</button>
+        <button type="button" class="room-btn" (click)="backToRooms()">{{ jam.isHost() ? 'Mis salas' : 'Salir' }}</button>
       </div>
     </header>
+
+    @if (!jam.connected()) {
+      <p class="room-banner" role="status">Reconectando…</p>
+    } @else if (!jam.isHost() && !jam.hostOnline()) {
+      <p class="room-banner" role="status">El anfitrión no está conectado. Puedes seguir pidiendo y votando; la música vuelve cuando regrese.</p>
+    }
 
     <div class="room-grid">
       <app-chat class="room-chat"></app-chat>
       <aside class="room-side">
-        <app-jam-panel></app-jam-panel>
         <app-playlist></app-playlist>
+        <app-jam-panel></app-jam-panel>
       </aside>
     </div>
   </div>

@@ -25,7 +25,9 @@ export class JamPanelComponent implements OnInit {
   currentSong = signal<Song | null>(null);
   qrReady = signal(false);
   isHost = signal(false);
-  listenLocally = signal(true);
+  get roomName() {
+    return this.jam.roomName;
+  }
 
   constructor(
     private jam: JamService,
@@ -38,7 +40,6 @@ export class JamPanelComponent implements OnInit {
       this.participants.set(this.jam.participants());
       this.currentSong.set(this.state.currentSong$.value);
       this.isHost.set(this.jam.isHost());
-      this.listenLocally.set(this.jam.listenLocally());
 
       if (this.jam.sessionCode() && !this.qrReady()) {
         this.generateQR();
@@ -94,7 +95,4 @@ export class JamPanelComponent implements OnInit {
     navigator.clipboard.writeText(this.jam.sessionCode());
   }
 
-  setListenMode(local: boolean): void {
-    this.jam.switchListenMode(local);
-  }
 }

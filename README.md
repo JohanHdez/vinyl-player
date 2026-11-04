@@ -13,6 +13,7 @@ Reproductor de musica web con estetica de tocadiscos vintage. Busca y reproduce 
 - **Explorar** — Generos y estados de animo (como YouTube Music), artistas principales, paginas de artista con sus canciones mas escuchadas y artistas parecidos, y listas destacadas por categoria
 - **Compartir por WhatsApp** — Enlace a una cancion (`?song=`) o a una sala (`?jam=`) con vista previa: titulo, artista y portada de la cancion
 - **Versiones bloqueadas** — Si YouTube no deja reproducir un video fuera de su sitio, busca otra version de la misma cancion y la pone en su lugar
+- **Votos** — Lo que se comparte en el chat entra a la cola; la canción más votada de las que esperan suena primero (a igualdad de votos, los pedidos van antes que la radio)
 - **Salas** — Chat en tiempo real tipo Messenger: burbujas, "esta escribiendo...", reacciones, canciones compartidas como tarjetas con "Poner ahora" / "+ Cola", avisos de quien entra o agrega musica, historial para quien llega tarde y contador de no leidos
 - **Jam Sessions** — Sesiones colaborativas en tiempo real:
   - Crea una sesion y comparte el codigo QR
@@ -161,6 +162,20 @@ docker-compose.yml   # Orquestacion con Docker Compose
 | `npm run cy:open` | Abrir Cypress para tests E2E |
 
 La integracion continua (`.github/workflows/ci.yml`) corre `npm test` y el build en cada push y pull request.
+
+## Desplegar en Railway
+
+Vinyl necesita un servidor Node siempre encendido (Socket.IO mantiene conexiones abiertas), por eso va en
+Railway y no en Vercel (Vercel ejecuta funciones que se apagan y no sirve para WebSockets).
+
+1. En [railway.com](https://railway.com): **New Project → Deploy from GitHub repo → vinyl-player**.
+   Railway detecta `railway.json` y construye con el `Dockerfile`.
+2. **Settings → Networking → Generate Domain** para tener una URL pública fija.
+3. Para que las salas sobrevivan a reinicios y despliegues: **New → Volume**, móntalo en `/data` y agrega la
+   variable `DATA_DIR=/data`.
+4. Listo: el QR y los enlaces de invitación usan esa URL.
+
+Railway revisa `/api/health` para saber si el despliegue quedó bien.
 
 ## Licencia
 

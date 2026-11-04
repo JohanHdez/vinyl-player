@@ -1,392 +1,370 @@
 "use strict";
 
-// Sesiones Jam: varias personas comparten una cola y la reproducción en tiempo
-// real vía Socket.IO. El estado vive en memoria (se pierde al reiniciar).
+// Salas: un anfitrión pone la música en su dispositivo y los invitados son
+// control remoto (piden canciones, chatean, reaccionan). Todo por Socket.IO.
+//
+// Reglas:
+// - Solo suena en el dispositivo del anfitrión. Los invitados nunca reproducen audio.
+// - Reproducir, saltar, pausar y quitar canciones es solo del anfitrión.
+// - El anfitrión se identifica con una llave secreta (hostKey) que recibe al crear
+//   la sala; con ella puede volver desde cualquier recarga o desde "Mis salas".
+// - Si el anfitrión se va, la sala espera: el control NUNCA pasa a un invitado.
+// - Una persona puede tener varias salas, pero cada conexión está en una a la vez.
+// - Las salas vacías duran ROOM_TTL_MS sin actividad; con DATA_DIR se guardan en disco.
 
+const crypto = require("crypto");
 const chat = require("./chat");
+const { createRoomStore } = require("./store");
+const { orderQueue, toggleVote } = require("./queue-order");
 
+const ROOM_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const GUEST_GRACE_MS = 5 * 60 * 1000;
+const MAX_QUEUE = 300;
+
+/** @type {Map<string, any>} */
 const sessions = new Map();
 // 8 mensajes cada 10 s por persona: suficiente para conversar, corta el spam.
 const chatLimiter = new chat.RateLimiter({ limit: 8, windowMs: 10_000 });
 
-/** Agrega un mensaje al historial de la sala y lo envía a todos (incluido quien lo mandó). */
-function postMessage(io, session, message) {
-  chat.appendMessage(session.messages, message);
-  io.to(session.sessionId).emit("chat-message", message);
-}
-
-function systemMessage(io, session, text) {
-  postMessage(io, session, chat.createMessage({ type: "system", author: "", text }));
-}
-
-function participantOf(session, socketId) {
-  return session.participants.find((p) => p.id === socketId);
-}
-
 function generateCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
+  do {
+    code = "";
+    for (let i = 0; i < 6; i++) code += chars[crypto.randomInt(chars.length)];
+  } while (sessions.has(code));
   return code;
 }
 
-function registerJamHandlers(io) {
-io.on("connection", (socket) => {
-  let currentSession = null;
+function newRoom({ code = generateCode(), name, hostKey = crypto.randomBytes(16).toString("hex"), playlist = [], currentIndex = -1, messages = [], createdAt = Date.now(), lastActiveAt = Date.now() }) {
+  return {
+    sessionId: `jam_${code}`,
+    code,
+    name: chat.cleanText(name, 40) || "Sala sin nombre",
+    hostKey,
+    hostId: null,
+    participants: [],
+    playlist: Array.isArray(playlist) ? playlist.slice(0, MAX_QUEUE) : [],
+    currentIndex: Number.isInteger(currentIndex) ? currentIndex : -1,
+    isPlaying: false,
+    currentTime: 0,
+    duration: 0,
+    lastUpdated: Date.now(),
+    messages: Array.isArray(messages) ? messages : [],
+    createdAt,
+    lastActiveAt,
+  };
+}
 
-  socket.on("create-session", ({ name, playlist, currentIndex, currentTime, duration, isPlaying }) => {
-    const code = generateCode();
-    const sessionId = `jam_${code}`;
-    const participant = { id: socket.id, name: chat.cleanName(name, "Host"), isHost: true };
-    const session = {
-      sessionId,
-      code,
-      hostId: socket.id,
-      participants: [participant],
-      playlist: Array.isArray(playlist) ? playlist : [],
-      currentIndex: typeof currentIndex === "number" ? currentIndex : -1,
-      isPlaying: !!isPlaying,
-      currentTime: currentTime || 0,
-      duration: duration || 0,
-      lastUpdated: Date.now(),
-      messages: [],
-    };
-    sessions.set(code, session);
-    currentSession = code;
-    socket.join(sessionId);
-    socket.emit("session-created", { sessionId, code, messages: session.messages });
-    systemMessage(io, session, `${participant.name} abrió la sala`);
-    io.to(sessionId).emit("participant-joined", {
-      participants: session.participants,
-    });
-  });
+const active = (room) => room.participants.filter((p) => !p.disconnectedAt);
+const participantOf = (room, socketId) => room.participants.find((p) => p.id === socketId);
+const publicParticipants = (room) =>
+  active(room).map(({ id, name, isHost }) => ({ id, name, isHost, listenLocally: isHost }));
 
-  socket.on("join-session", ({ code, name, listenLocally }) => {
-    const session = sessions.get(code);
-    if (!session) {
-      socket.emit("error", { message: "Sesion no encontrada" });
-      return;
-    }
-    const participant = {
-      id: socket.id,
-      name: chat.cleanName(name),
-      isHost: false,
-      listenLocally: listenLocally !== false,
-    };
-    session.participants.push(participant);
-    currentSession = code;
-    socket.join(session.sessionId);
-    socket.emit("session-joined", {
-      sessionId: session.sessionId,
-      code: session.code,
-      participants: session.participants,
-      messages: session.messages,
-    });
-    systemMessage(io, session, `${participant.name} se unió a la sala`);
-    // Sync existing state to new participant
-    let estimatedTime = session.currentTime;
-    if (session.isPlaying && session.lastUpdated) {
-      estimatedTime += (Date.now() - session.lastUpdated) / 1000;
-    }
-    socket.emit("sync-state", {
-      playlist: session.playlist,
-      currentIndex: session.currentIndex,
-      isPlaying: session.isPlaying,
-      currentTime: estimatedTime,
-      duration: session.duration || 0,
-    });
-    io.to(session.sessionId).emit("participant-joined", {
-      participants: session.participants,
-    });
-  });
+function estimatedTime(room) {
+  return room.isPlaying && room.lastUpdated ? room.currentTime + (Date.now() - room.lastUpdated) / 1000 : room.currentTime;
+}
 
-  socket.on("add-song", ({ song }) => {
-    if (!currentSession) return;
-    const session = sessions.get(currentSession);
-    if (!session) return;
-    // Broadcast to all others in the session
-    socket.to(session.sessionId).emit("song-added", { song });
-    session.playlist.push(song);
-    // Avisa en el chat quién agregó qué (salvo lo que agrega la radio, para no llenar el chat).
-    const who = participantOf(session, socket.id);
-    const clean = chat.cleanSong(song);
-    if (who && clean && song.source !== "radio") {
-      systemMessage(io, session, `${who.name} agregó «${clean.title}» a la cola`);
-    }
-  });
+/** Estado para quien entra o vuelve a la sala. */
+function roomSnapshot(room, socketId) {
+  return {
+    sessionId: room.sessionId,
+    code: room.code,
+    roomName: room.name,
+    participants: publicParticipants(room),
+    isHost: room.hostId === socketId,
+    hostOnline: !!room.hostId,
+    messages: room.messages,
+  };
+}
 
-  // ── Chat de la sala ─────────────────────────────────────
-  const withSession = (handler) => (payload = {}) => {
-    const session = currentSession && sessions.get(currentSession);
-    const me = session && participantOf(session, socket.id);
-    if (!session || !me) return;
-    handler(session, me, payload);
+function syncState(room) {
+  return {
+    playlist: room.playlist,
+    currentIndex: room.currentIndex,
+    isPlaying: room.isPlaying,
+    currentTime: estimatedTime(room),
+    duration: room.duration || 0,
+  };
+}
+
+/** Estado público de varias salas (para "Mis salas"). */
+function getRoomsStatus(codes) {
+  return (Array.isArray(codes) ? codes : [])
+    .filter((c) => typeof c === "string")
+    .slice(0, 50)
+    .map((code) => {
+      const room = sessions.get(code.toUpperCase());
+      return room
+        ? { code: room.code, exists: true, name: room.name, people: active(room).length, hostOnline: !!room.hostId }
+        : { code, exists: false };
+    });
+}
+
+/**
+ * @param {import("socket.io").Server} io
+ * @param {{ store?: ReturnType<typeof createRoomStore>, now?: () => number }} [opts]
+ */
+function registerJamHandlers(io, { store = createRoomStore() } = {}) {
+  for (const saved of store.load()) {
+    if (saved?.code && !sessions.has(saved.code)) sessions.set(saved.code, newRoom(saved));
+  }
+  const persist = () => store.scheduleSave(() => [...sessions.values()]);
+
+  const touch = (room) => {
+    room.lastActiveAt = Date.now();
+    persist();
   };
 
-  // El anfitrión cambia una versión bloqueada fuera de YouTube por otra que sí suena.
-  socket.on("replace-song", withSession((session, _me, { index, song }) => {
-    if (session.hostId !== socket.id) return;
+  const postMessage = (room, message) => {
+    chat.appendMessage(room.messages, message);
+    io.to(room.sessionId).emit("chat-message", message);
+    touch(room);
+  };
+  const systemMessage = (room, text) => postMessage(room, chat.createMessage({ type: "system", author: "", text }));
+  const broadcastPeople = (room, event = "participant-joined") =>
+    io.to(room.sessionId).emit(event, { participants: publicParticipants(room) });
+  const broadcastHost = (room) => io.to(room.sessionId).emit("host-status", { online: !!room.hostId });
+  /** Ordena la cola por votos y la envía completa a todos: así nadie queda con otro orden. */
+  const broadcastQueue = (room) => {
+    room.playlist = orderQueue(room.playlist, room.currentIndex);
+    io.to(room.sessionId).emit("queue-updated", { playlist: room.playlist, currentIndex: room.currentIndex });
+    touch(room);
+  };
+  /** Agrega una canción pedida (si no estaba). Devuelve la entrada, o null. */
+  const enqueue = (room, me, song, source) => {
     const clean = chat.cleanSong(song);
-    if (!clean || !Number.isInteger(index) || index < 0 || index >= session.playlist.length) return;
-    const replacement = { ...clean, ...(song.source === "radio" ? { source: "radio" } : {}) };
-    session.playlist[index] = replacement;
-    socket.to(session.sessionId).emit("song-replaced", { index, song: replacement });
-  }));
-
-  const allowed = () => {
-    if (chatLimiter.allow(socket.id)) return true;
-    socket.emit("chat-error", { message: "Vas muy rápido. Espera unos segundos." });
-    return false;
+    if (!clean || room.playlist.length >= MAX_QUEUE) return null;
+    if (room.playlist.some((s) => s.videoId === clean.videoId)) return null;
+    const entry = { ...clean, ...(source === "radio" ? { source: "radio" } : {}), addedBy: me.name, addedAt: Date.now(), votes: [] };
+    room.playlist.push(entry);
+    return entry;
   };
 
-  socket.on("chat-message", withSession((session, me, { text }) => {
-    const clean = chat.cleanText(text);
-    if (!clean || !allowed()) return;
-    postMessage(io, session, chat.createMessage({ type: "text", author: me.name, authorId: me.id, text: clean }));
-  }));
+  // Limpia salas vacías e inactivas.
+  const sweeper = setInterval(() => {
+    const cutoff = Date.now() - ROOM_TTL_MS;
+    for (const [code, room] of sessions) {
+      if (active(room).length === 0 && room.lastActiveAt < cutoff) sessions.delete(code);
+    }
+    persist();
+  }, 60 * 60 * 1000);
+  sweeper.unref?.();
 
-  socket.on("share-song", withSession((session, me, { song, text }) => {
-    const clean = chat.cleanSong(song);
-    if (!clean || !allowed()) return;
-    postMessage(io, session, chat.createMessage({
-      type: "song", author: me.name, authorId: me.id, song: clean, text: chat.cleanText(text) || "",
-    }));
-  }));
+  io.on("connection", (socket) => {
+    let currentCode = null;
+    const current = () => (currentCode ? sessions.get(currentCode) : null);
+    const isHostOf = (room) => room && room.hostId === socket.id;
 
-  socket.on("react", withSession((session, me, { messageId, emoji }) => {
-    const updated = chat.toggleReaction(session.messages, messageId, emoji, me.id);
-    if (updated) io.to(session.sessionId).emit("chat-reaction", { messageId, reactions: updated.reactions });
-  }));
+    /** Sale de la sala actual (si hay) antes de entrar a otra. */
+    const leaveCurrent = ({ graceful }) => {
+      const room = current();
+      if (!room) return;
+      const me = participantOf(room, socket.id);
+      socket.leave(room.sessionId);
+      currentCode = null;
+      chatLimiter.forget(socket.id);
+      if (!me) return;
 
-  socket.on("typing", withSession((session, me) => {
-    socket.to(session.sessionId).emit("typing", { id: me.id, name: me.name });
-  }));
+      if (me.isHost) {
+        // El anfitrión se va: la música se pausa y la sala espera su regreso.
+        room.participants = room.participants.filter((p) => p !== me);
+        room.hostId = null;
+        room.isPlaying = false;
+        broadcastHost(room);
+        broadcastPeople(room, "participant-left");
+        systemMessage(room, graceful ? "El anfitrión se desconectó. La música vuelve cuando regrese." : `${me.name} cerró la sala por ahora. La música vuelve cuando regrese.`);
+        return;
+      }
 
-  socket.on("remove-song", ({ index }) => {
-    if (!currentSession) return;
-    const session = sessions.get(currentSession);
-    if (!session) return;
-    socket.to(session.sessionId).emit("song-removed", { index });
-    session.playlist.splice(index, 1);
-  });
+      if (graceful) {
+        // Invitado desconectado: se le guarda el lugar unos minutos por si vuelve.
+        me.disconnectedAt = Date.now();
+        broadcastPeople(room, "participant-disconnected");
+        me.disconnectTimer = setTimeout(() => {
+          if (!room.participants.includes(me) || !me.disconnectedAt) return;
+          room.participants = room.participants.filter((p) => p !== me);
+          broadcastPeople(room, "participant-left");
+          systemMessage(room, `${me.name} salió de la sala`);
+        }, GUEST_GRACE_MS);
+        me.disconnectTimer.unref?.();
+        return;
+      }
 
-  socket.on("play-song", ({ index }) => {
-    if (!currentSession) return;
-    const session = sessions.get(currentSession);
-    if (!session) return;
-    // Any participant can select which song to play
-    session.currentIndex = index;
-    session.isPlaying = true;
-    session.currentTime = 0;
-    session.lastUpdated = Date.now();
-    socket.to(session.sessionId).emit("song-played", { index });
-  });
+      room.participants = room.participants.filter((p) => p !== me);
+      broadcastPeople(room, "participant-left");
+      systemMessage(room, `${me.name} salió de la sala`);
+    };
 
-  socket.on("pause-song", ({ currentTime }) => {
-    if (!currentSession) return;
-    const session = sessions.get(currentSession);
-    if (!session) return;
-    if (session.hostId !== socket.id) return;
-    session.isPlaying = false;
-    session.currentTime = currentTime;
-    session.lastUpdated = Date.now();
-    socket.to(session.sessionId).emit("song-paused", { currentTime });
-  });
+    const enter = (room, participant, event) => {
+      room.participants.push(participant);
+      currentCode = room.code;
+      socket.join(room.sessionId);
+      socket.emit(event, roomSnapshot(room, socket.id));
+      socket.emit("sync-state", syncState(room));
+      broadcastPeople(room);
+    };
 
-  socket.on("resume-song", ({ currentTime }) => {
-    if (!currentSession) return;
-    const session = sessions.get(currentSession);
-    if (!session) return;
-    if (session.hostId !== socket.id) return;
-    session.isPlaying = true;
-    session.currentTime = currentTime;
-    session.lastUpdated = Date.now();
-    socket.to(session.sessionId).emit("song-resumed", { currentTime });
-  });
+    socket.on("create-session", ({ name, roomName, playlist, currentIndex } = {}) => {
+      leaveCurrent({ graceful: false });
+      const room = newRoom({ name: roomName, playlist: (Array.isArray(playlist) ? playlist : []).map(chat.cleanSong).filter(Boolean), currentIndex });
+      sessions.set(room.code, room);
+      room.hostId = socket.id;
+      const me = { id: socket.id, name: chat.cleanName(name, "Anfitrión"), isHost: true };
+      room.participants.push(me);
+      currentCode = room.code;
+      socket.join(room.sessionId);
+      socket.emit("session-created", { ...roomSnapshot(room, socket.id), hostKey: room.hostKey });
+      systemMessage(room, `${me.name} abrió «${room.name}»`);
+      broadcastPeople(room);
+    });
 
-  socket.on("seek-song", ({ currentTime }) => {
-    if (!currentSession) return;
-    const session = sessions.get(currentSession);
-    if (!session) return;
-    if (session.hostId !== socket.id) return;
-    session.currentTime = currentTime;
-    session.lastUpdated = Date.now();
-    socket.to(session.sessionId).emit("song-seeked", { currentTime });
-  });
+    socket.on("join-session", ({ code, name } = {}) => {
+      const room = typeof code === "string" ? sessions.get(code.trim().toUpperCase()) : null;
+      if (!room) return socket.emit("error", { message: "No encontré esa sala. Revisa el código." });
+      leaveCurrent({ graceful: false });
+      const me = { id: socket.id, name: chat.cleanName(name), isHost: false };
+      enter(room, me, "session-joined");
+      systemMessage(room, `${me.name} se unió a la sala`);
+    });
 
-  socket.on("sync-playback", ({ currentTime, duration, isPlaying }) => {
-    if (!currentSession) return;
-    const session = sessions.get(currentSession);
-    if (!session) return;
-    if (session.hostId !== socket.id) return;
-    session.currentTime = currentTime;
-    session.isPlaying = isPlaying;
-    if (duration) session.duration = duration;
-    session.lastUpdated = Date.now();
-    socket.to(session.sessionId).emit("playback-synced", { currentTime, duration: session.duration, isPlaying });
-  });
+    // Volver a una sala: como anfitrión (con su llave) o como invitado (por nombre).
+    socket.on("rejoin-session", ({ code, name, hostKey } = {}) => {
+      const room = typeof code === "string" ? sessions.get(code.trim().toUpperCase()) : null;
+      if (!room) return socket.emit("session-expired", { code });
+      if (currentCode !== room.code) leaveCurrent({ graceful: false });
 
-  socket.on("update-listen-mode", ({ listenLocally }) => {
-    if (!currentSession) return;
-    const session = sessions.get(currentSession);
-    if (!session) return;
-    const participant = session.participants.find((p) => p.id === socket.id);
-    if (participant) {
-      participant.listenLocally = listenLocally;
-      io.to(session.sessionId).emit("participant-updated", {
-        participants: session.participants.filter((p) => !p.disconnectedAt),
+      const asHost = typeof hostKey === "string" && hostKey.length > 0 && hostKey === room.hostKey;
+      if (asHost) {
+        // Si había otra conexión del anfitrión (otra pestaña), la nueva toma el control.
+        room.participants = room.participants.filter((p) => !p.isHost);
+        room.hostId = socket.id;
+        enter(room, { id: socket.id, name: chat.cleanName(name, "Anfitrión"), isHost: true }, "session-joined");
+        broadcastHost(room);
+        systemMessage(room, "El anfitrión volvió 🎶");
+        return;
+      }
+
+      const waiting = room.participants.find((p) => !p.isHost && p.disconnectedAt && p.name === chat.cleanName(name));
+      if (waiting) {
+        clearTimeout(waiting.disconnectTimer);
+        room.participants = room.participants.filter((p) => p !== waiting);
+      }
+      enter(room, { id: socket.id, name: chat.cleanName(name), isHost: false }, "session-joined");
+    });
+
+    socket.on("leave-session", () => leaveCurrent({ graceful: false }));
+    socket.on("disconnect", () => leaveCurrent({ graceful: true }));
+
+    // ── Cola ────────────────────────────────────────────────
+
+    socket.on("add-song", ({ song } = {}) => {
+      const room = current();
+      const me = room && participantOf(room, socket.id);
+      if (!me) return;
+      const entry = enqueue(room, me, song, song?.source);
+      if (!entry) return;
+      broadcastQueue(room);
+      if (entry.source !== "radio") systemMessage(room, `${me.name} agregó «${entry.title}» a la cola`);
+    });
+
+    // Votar sube una canción en la cola: la más votada de las que esperan suena primero.
+    socket.on("vote-song", ({ videoId } = {}) => {
+      const room = current();
+      const me = room && participantOf(room, socket.id);
+      if (me && toggleVote(room.playlist, room.currentIndex, videoId, me.id)) broadcastQueue(room);
+    });
+
+    socket.on("remove-song", ({ index } = {}) => {
+      const room = current();
+      if (!isHostOf(room) || !Number.isInteger(index) || index < 0 || index >= room.playlist.length) return;
+      room.playlist.splice(index, 1);
+      if (index < room.currentIndex) room.currentIndex--;
+      else if (index === room.currentIndex) room.currentIndex = -1;
+      broadcastQueue(room);
+    });
+
+    socket.on("play-song", ({ index } = {}) => {
+      const room = current();
+      if (!isHostOf(room) || !Number.isInteger(index) || index < 0 || index >= room.playlist.length) return;
+      Object.assign(room, { currentIndex: index, isPlaying: true, currentTime: 0, lastUpdated: Date.now() });
+      socket.to(room.sessionId).emit("song-played", { index });
+      broadcastQueue(room);
+    });
+
+    socket.on("replace-song", ({ index, song } = {}) => {
+      const room = current();
+      const clean = chat.cleanSong(song);
+      if (!isHostOf(room) || !clean || !Number.isInteger(index) || index < 0 || index >= room.playlist.length) return;
+      const old = room.playlist[index];
+      room.playlist[index] = { ...old, ...clean };
+      socket.to(room.sessionId).emit("song-replaced", { index, song: room.playlist[index] });
+      broadcastQueue(room);
+    });
+
+    // ── Reproducción (solo anfitrión) ───────────────────────
+
+    const playback = (event, update, emit) =>
+      socket.on(event, (payload = {}) => {
+        const room = current();
+        if (!isHostOf(room) || typeof payload.currentTime !== "number") return;
+        update(room, payload);
+        room.lastUpdated = Date.now();
+        socket.to(room.sessionId).emit(emit, emit === "playback-synced"
+          ? { currentTime: room.currentTime, duration: room.duration, isPlaying: room.isPlaying }
+          : { currentTime: room.currentTime });
       });
-    }
-  });
 
-  socket.on("leave-session", () => {
-    handleLeaveImmediate(io, socket, currentSession);
-    currentSession = null;
-  });
+    playback("pause-song", (r, p) => Object.assign(r, { isPlaying: false, currentTime: p.currentTime }), "song-paused");
+    playback("resume-song", (r, p) => Object.assign(r, { isPlaying: true, currentTime: p.currentTime }), "song-resumed");
+    playback("seek-song", (r, p) => Object.assign(r, { currentTime: p.currentTime }), "song-seeked");
+    playback("sync-playback", (r, p) => {
+      Object.assign(r, { currentTime: p.currentTime, isPlaying: !!p.isPlaying });
+      if (p.duration) r.duration = p.duration;
+    }, "playback-synced");
 
-  socket.on("disconnect", () => {
-    handleDisconnectGraceful(io, socket, currentSession);
-  });
+    // ── Chat ────────────────────────────────────────────────
 
-  socket.on("rejoin-session", ({ code, name }) => {
-    const session = sessions.get(code);
-    if (!session) {
-      socket.emit("session-expired");
-      return;
-    }
-    // Find disconnected participant by name
-    const existing = session.participants.find(
-      (p) => p.name === name && p.disconnectedAt
-    );
-    if (existing) {
-      // Clear grace period timer
-      if (existing.disconnectTimer) {
-        clearTimeout(existing.disconnectTimer);
-        delete existing.disconnectTimer;
+    const withMe = (handler) => (payload = {}) => {
+      const room = current();
+      const me = room && participantOf(room, socket.id);
+      if (me) handler(room, me, payload);
+    };
+
+    const allowed = () => {
+      if (chatLimiter.allow(socket.id)) return true;
+      socket.emit("chat-error", { message: "Vas muy rápido. Espera unos segundos." });
+      return false;
+    };
+
+    socket.on("chat-message", withMe((room, me, { text }) => {
+      const clean = chat.cleanText(text);
+      if (!clean || !allowed()) return;
+      postMessage(room, chat.createMessage({ type: "text", author: me.name, authorId: me.id, text: clean }));
+    }));
+
+    // Compartir una canción en el chat también la pide: queda en la cola para votar.
+    socket.on("share-song", withMe((room, me, { song, text }) => {
+      const clean = chat.cleanSong(song);
+      if (!clean || !allowed()) return;
+      postMessage(room, chat.createMessage({ type: "song", author: me.name, authorId: me.id, song: clean, text: chat.cleanText(text) || "" }));
+      if (enqueue(room, me, clean)) broadcastQueue(room);
+    }));
+
+    socket.on("react", withMe((room, me, { messageId, emoji }) => {
+      const updated = chat.toggleReaction(room.messages, messageId, emoji, me.id);
+      if (updated) {
+        io.to(room.sessionId).emit("chat-reaction", { messageId, reactions: updated.reactions });
+        touch(room);
       }
-      existing.oldSocketId = existing.id;
-      existing.id = socket.id;
-      delete existing.disconnectedAt;
-      if (existing.isHost) {
-        session.hostId = socket.id;
-      }
-    } else {
-      // Join as new participant
-      const participant = {
-        id: socket.id,
-        name: name || "Invitado",
-        isHost: false,
-      };
-      session.participants.push(participant);
-    }
-    currentSession = code;
-    socket.join(session.sessionId);
-    socket.emit("session-joined", {
-      sessionId: session.sessionId,
-      code: session.code,
-      participants: session.participants.filter((p) => !p.disconnectedAt),
-      isHost: session.hostId === socket.id,
-      messages: session.messages,
-    });
-    // Sync state
-    let estimatedTime = session.currentTime;
-    if (session.isPlaying && session.lastUpdated) {
-      estimatedTime += (Date.now() - session.lastUpdated) / 1000;
-    }
-    socket.emit("sync-state", {
-      playlist: session.playlist,
-      currentIndex: session.currentIndex,
-      isPlaying: session.isPlaying,
-      currentTime: estimatedTime,
-      duration: session.duration || 0,
-    });
-    io.to(session.sessionId).emit("participant-joined", {
-      participants: session.participants.filter((p) => !p.disconnectedAt),
-    });
-  });
-});
+    }));
 
+    socket.on("typing", withMe((room, me) => {
+      socket.to(room.sessionId).emit("typing", { id: me.id, name: me.name });
+    }));
+  });
+
+  return { persistNow: () => store.saveNow([...sessions.values()]) };
 }
 
-// Immediate leave (explicit leave-session)
-function handleLeaveImmediate(io, socket, code) {
-  if (!code) return;
-  const session = sessions.get(code);
-  if (!session) return;
-  chatLimiter.forget(socket.id);
-  const leaving = participantOf(session, socket.id);
-
-  session.participants = session.participants.filter(
-    (p) => p.id !== socket.id
-  );
-
-  if (session.participants.length === 0) {
-    sessions.delete(code);
-    return;
-  }
-
-  // If host left, promote first active participant
-  if (session.hostId === socket.id) {
-    const active = session.participants.find((p) => !p.disconnectedAt);
-    if (active) {
-      session.hostId = active.id;
-      active.isHost = true;
-    }
-  }
-
-  io.to(session.sessionId).emit("participant-left", {
-    participants: session.participants.filter((p) => !p.disconnectedAt),
-  });
-  if (leaving) systemMessage(io, session, `${leaving.name} salió de la sala`);
-}
-
-// Graceful disconnect with 5 min grace period
-function handleDisconnectGraceful(io, socket, code) {
-  if (!code) return;
-  const session = sessions.get(code);
-  if (!session) return;
-
-  const participant = session.participants.find((p) => p.id === socket.id);
-  if (!participant) return;
-
-  participant.disconnectedAt = Date.now();
-
-  io.to(session.sessionId).emit("participant-disconnected", {
-    participants: session.participants.filter((p) => !p.disconnectedAt),
-    disconnectedName: participant.name,
-  });
-
-  // Grace period: 5 minutes
-  participant.disconnectTimer = setTimeout(() => {
-    const sess = sessions.get(code);
-    if (!sess) return;
-    const p = sess.participants.find((pp) => pp.id === socket.id && pp.disconnectedAt);
-    if (!p) return;
-
-    sess.participants = sess.participants.filter((pp) => pp.id !== socket.id);
-
-    if (sess.participants.length === 0) {
-      sessions.delete(code);
-      return;
-    }
-
-    if (sess.hostId === socket.id) {
-      const active = sess.participants.find((pp) => !pp.disconnectedAt);
-      if (active) {
-        sess.hostId = active.id;
-        active.isHost = true;
-      }
-    }
-
-    io.to(sess.sessionId).emit("participant-left", {
-      participants: sess.participants.filter((pp) => !pp.disconnectedAt),
-    });
-    systemMessage(io, sess, `${p.name} salió de la sala`);
-  }, 5 * 60 * 1000);
-  // No retiene el proceso solo por este temporizador (permite cerrar pruebas y apagados limpios).
-  participant.disconnectTimer.unref?.();
-}
-
-module.exports = { registerJamHandlers, sessions };
+module.exports = { registerJamHandlers, getRoomsStatus, sessions, ROOM_TTL_MS };

@@ -142,3 +142,55 @@
   .room-grid { grid-template-columns: 1fr; }
   .room-chat { height: 70vh; }
 }
+
+// ── Portada v2: Mis salas, pestañas y formulario ──
+.lobby-heading { font-family: 'Syne', sans-serif; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 10px; }
+
+.my-rooms { margin-bottom: 26px; }
+.my-rooms ul { list-style: none; display: grid; gap: 8px; }
+.my-room {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-radius: var(--radius-md);
+  background: var(--bg-glass); border: 1px solid var(--glass-border);
+}
+.my-room-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.my-room-info strong { color: var(--text-primary); font-size: 0.95rem; }
+.my-room-info span { color: var(--text-secondary); font-size: 0.78rem; letter-spacing: 0.02em; }
+
+.lobby-tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--bg-surface); border: 1px solid var(--glass-border); margin-bottom: 14px; }
+.lobby-tabs button {
+  font: inherit; font-size: 0.85rem; padding: 8px 16px; border-radius: 999px; border: 0;
+  background: none; color: var(--text-secondary); cursor: pointer;
+  &.active { background: var(--bg-elevated); color: var(--text-primary); }
+}
+
+.lobby-card { max-width: 520px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field span { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-brass); }
+.field input {
+  font: inherit; font-size: 1rem; padding: 12px 16px; border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border); background: var(--bg-elevated); color: var(--text-primary);
+  &:focus { outline: none; border-color: var(--accent-brass); }
+}
+.code-input { text-transform: uppercase; letter-spacing: 0.3em; font-family: 'Syne', sans-serif; font-weight: 600; }
+
+.ideas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
+.idea {
+  font: inherit; font-size: 0.78rem; padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--glass-border); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;
+  &:hover, &.active { border-color: var(--accent-brass); color: var(--text-primary); }
+}
+
+.fine { font-size: 0.8rem !important; color: var(--text-secondary); line-height: 1.5; a { color: var(--accent-bright); } strong { color: var(--text-primary); } }
+
+.room-btn--big { padding: 12px 26px; font-size: 0.95rem; }
+.room-btn--ghost { background: none; color: var(--text-secondary); }
+
+// ── Sala ──
+.room-title { display: flex; flex-direction: column; }
+.room-title h1 { letter-spacing: 0; font-size: 1.7rem; }
+.room-banner {
+  padding: 10px 14px; border-radius: var(--radius-md);
+  background: rgba(196, 75, 63, 0.14); border: 1px solid rgba(196, 75, 63, 0.35);
+  color: var(--text-primary); font-size: 0.85rem;
+}

@@ -1,24 +1,29 @@
-import { Component, OnInit, OnDestroy, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, OnDestroy, computed, inject, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { PlayerStateService } from '../../services/player-state.service';
+import { JamService } from '../../services/jam.service';
 import { Song } from '../../models/song.model';
 
 @Component({
   selector: 'app-playlist',
   standalone: true,
-  imports: [CommonModule],
   templateUrl: './playlist.component.html',
   styleUrl: './playlist.component.scss',
 })
 export class PlaylistComponent implements OnInit, OnDestroy {
+  private readonly state = inject(PlayerStateService);
+  readonly jam = inject(JamService);
+
   playlist = signal<Song[]>([]);
   currentIndex = signal(-1);
   isPlaying = signal(false);
 
-  private subs: Subscription[] = [];
+  /** En una sala se vota; fuera de una sala la cola es solo tuya. */
+  readonly inRoom = computed(() => this.jam.isInSession());
+  /** Reproducir y quitar es del anfitrión (o tuyo si no estás en una sala). */
+  readonly canControl = computed(() => !this.jam.isInSession() || this.jam.isHost());
 
-  constructor(private state: PlayerStateService) {}
+  private subs: Subscription[] = [];
 
   ngOnInit(): void {
     this.subs.push(
@@ -33,12 +38,25 @@ export class PlaylistComponent implements OnInit, OnDestroy {
   }
 
   playSong(index: number): void {
-    this.state.play(index);
+    if (this.canControl()) this.state.play(index);
   }
 
   remove(event: MouseEvent, index: number): void {
     event.stopPropagation();
     this.state.removeFromPlaylist(index);
+  }
+
+  vote(event: MouseEvent, song: Song): void {
+    event.stopPropagation();
+    this.jam.vote(song.videoId);
+  }
+
+  votes(song: Song): number {
+    return song.votes?.length ?? 0;
+  }
+
+  votedByMe(song: Song): boolean {
+    return !!song.votes?.includes(this.jam.myId);
   }
 
   thumbUrl(videoId: string): string {

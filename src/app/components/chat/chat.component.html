@@ -26,17 +26,26 @@
                 <div class="song-card">
                   <img [src]="thumb(song.videoId)" alt="" loading="lazy" />
                   <div class="song-info">
-                    <span class="song-label">🎵 Compartió una canción</span>
+                    <span class="song-label">🎵 La pidió para la cola</span>
                     <strong>{{ song.title }}</strong>
                     <span class="song-channel">{{ song.channel }}</span>
                   </div>
                 </div>
                 <div class="song-actions">
-                  <button type="button" (click)="playNow(song)">▶ Poner ahora</button>
-                  @if (isQueued(song)) {
-                    <button type="button" disabled>✓ En la cola</button>
+                  @if (jam.isHost()) {
+                    <button type="button" (click)="playNow(song)">▶ Poner ahora</button>
+                  }
+                  @if (queued(song); as q) {
+                    @if (isPlayingNow(song)) {
+                      <button type="button" disabled>♪ Sonando</button>
+                    } @else {
+                      <button type="button" class="vote" [class.voted]="votedByMe(q)" (click)="vote(song)"
+                              [attr.aria-pressed]="votedByMe(q)" [title]="votedByMe(q) ? 'Quitar mi voto' : 'Votar para que suene antes'">
+                        👍 {{ q.votes?.length ?? 0 }}
+                      </button>
+                    }
                   } @else {
-                    <button type="button" (click)="addToQueue(song)">+ Cola</button>
+                    <button type="button" (click)="addToQueue(song)">+ Pedir</button>
                   }
                   <app-share-button variant="inline" [song]="song" label="Enviar"></app-share-button>
                 </div>
@@ -79,7 +88,7 @@
         </button>
       }
       <form class="picker-search" (submit)="$event.preventDefault(); searchSongs()">
-        <input type="search" placeholder="Busca una canción para compartir" [value]="pickerQuery()" (input)="pickerQuery.set($any($event.target).value)" aria-label="Buscar canción para compartir" />
+        <input type="search" placeholder="Busca una canción (desde 3 letras)" [value]="pickerQuery()" (input)="onPickerInput($any($event.target).value)" aria-label="Buscar canción para compartir" />
         <button type="submit">Buscar</button>
       </form>
       @if (pickerLoading()) { <p class="picker-hint">Buscando…</p> }

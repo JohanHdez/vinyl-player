@@ -33,7 +33,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   readonly pickerResults = signal<Song[]>([]);
   readonly pickerLoading = signal(false);
   readonly currentSong = signal<Song | null>(null);
-  private readonly queuedIds = signal<ReadonlySet<string>>(new Set());
+  /** Canciones de la cola por id, para mostrar votos en las tarjetas del chat. */
+  private readonly queue = signal<ReadonlyMap<string, Song>>(new Map());
 
   readonly view = computed<ViewMessage[]>(() => toViewMessages(this.jam.messages(), this.jam.myId));
   readonly typingText = computed(() => typingLabel(this.jam.typing()));
@@ -44,7 +45,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   ngOnInit(): void {
     this.subs.push(
-      this.state.playlist$.subscribe(list => this.queuedIds.set(new Set(list.map(s => s.videoId)))),
+      this.state.playlist$.subscribe(list => this.queue.set(new Map(list.map(s => [s.videoId, s])))),
       this.state.currentSong$.subscribe(song => this.currentSong.set(song))
     );
   }
@@ -103,6 +104,15 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.share(song);
   }
 
+  private pickerTimer?: ReturnType<typeof setTimeout>;
+
+  /** Busca solo mientras escribes, desde 3 letras. */
+  onPickerInput(value: string): void {
+    this.pickerQuery.set(value);
+    clearTimeout(this.pickerTimer);
+    if (value.trim().length >= 3) this.pickerTimer = setTimeout(() => void this.searchSongs(), 450);
+  }
+
   async searchSongs(): Promise<void> {
     const q = this.pickerQuery().trim();
     if (!q) return;
@@ -122,8 +132,24 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   // ── Acciones sobre mensajes ─────────────────────────────
 
+  queued(song: Song): Song | undefined {
+    return this.queue().get(song.videoId);
+  }
+
+  isPlayingNow(song: Song): boolean {
+    return this.currentSong()?.videoId === song.videoId;
+  }
+
+  votedByMe(song: Song): boolean {
+    return !!song.votes?.includes(this.jam.myId);
+  }
+
+  vote(song: Song): void {
+    this.jam.vote(song.videoId);
+  }
+
   isQueued(song: Song): boolean {
-    return this.queuedIds().has(song.videoId);
+    return this.queue().has(song.videoId);
   }
 
   addToQueue(song: Song): void {

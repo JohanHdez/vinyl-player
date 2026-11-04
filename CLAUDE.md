@@ -105,6 +105,14 @@ docker-compose.yml           # Orquestacion con Docker Compose
 - Desde el servidor no se puede saber si un video permite insercion (InnerTube devuelve error 152 para todos), asi que se detecta en el navegador: errores 100/101/150 del IFrame API.
 - `PlaybackRecoveryService` busca la misma cancion (`recovery.ts`: palabras clave + similitud >= 0.6), prueba hasta 4 versiones con `replaceSong` y avisa cual puso. En una sala solo el host reemplaza (evento `replace-song` / `song-replaced`).
 
+### Salas v3 (reglas actuales)
+- Solo suena en el dispositivo del anfitrión; los invitados son control remoto (`state.guestMode`): `play()` queda como pedido y quitar está bloqueado.
+- El anfitrión tiene una `hostKey` (32 hex) que se guarda en "Mis salas" (localStorage `vinyl_my_rooms`); con ella vuelve con `rejoin-session`. El control NUNCA pasa a un invitado; si el anfitrión se va, `host-status {online:false}`.
+- Sin límite de salas por persona; cada conexión está en una a la vez (crear o entrar saca de la anterior).
+- La cola la ordena el servidor por votos (`jam/queue-order.js`) y la manda completa en `queue-updated` tras cada cambio. `share-song` también encola. `vote-song {videoId}` pone/quita voto.
+- Persistencia opcional en `DATA_DIR/rooms.json` (`jam/store.js`); salas vacías duran 30 días.
+- Despliegue: Railway (`railway.json`, healthcheck `/api/health`). Vercel no sirve (sin WebSockets persistentes).
+
 ### Salas (Jam Sessions + chat)
 - En la UI se llaman "Salas" (vista `room`). La portada pide nombre y permite crear o unirse con codigo; al entrar, la app cambia sola a la vista de la sala.
 - `JamService` expone `messages`, `typing`, `unread` (signals) y `sendMessage`, `shareSong`, `react`, `notifyTyping` (max. 1 cada 2 s).

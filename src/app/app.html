@@ -55,6 +55,8 @@
       </nav>
 
       <!-- Sidebar collapse toggle -->
+      <button type="button" class="sidebar-terms" (click)="setView('terms')">Términos y privacidad</button>
+
       <button class="sidebar-toggle" (click)="toggleSidebar()">
         <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
       </button>
@@ -117,14 +119,21 @@
       </div>
     }
 
+    <!-- TERMS VIEW -->
+    @if (currentView() === 'terms') {
+      <div class="view-pane view-terms">
+        <app-terms></app-terms>
+      </div>
+    }
+
     <!-- SEARCH VIEW -->
     @if (currentView() === 'search') {
       <div class="view-pane view-search">
         <div class="view-header">
           <h1 class="view-title font-display">Buscar</h1>
-          <p class="view-subtitle">Encuentra tu proxima cancion favorita</p>
+          <p class="view-subtitle">Encuentra tu próxima canción favorita</p>
         </div>
-        <app-search-bar (search)="onSearch($event)"></app-search-bar>
+        <app-search-bar [initial]="lastQuery()" [autofocus]="true" (search)="onSearch($event)"></app-search-bar>
         <app-search-results
           [results]="searchResults()"
           [loading]="searchLoading()"

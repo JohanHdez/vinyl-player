@@ -318,3 +318,5 @@
   .msg { max-width: 92%; }
   .bubble--song { width: 100%; }
 }
+
+.song-actions .vote.voted { border-color: var(--accent-bright); background: rgba(200, 152, 76, 0.25); }

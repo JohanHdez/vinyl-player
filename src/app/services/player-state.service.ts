@@ -94,7 +94,28 @@ export class PlayerStateService {
     if (this.onSongReplaced) this.onSongReplaced(index, song);
   }
 
-  removeFromPlaylist(index: number): void {
+  /**
+   * Invitado de una sala: solo suena en el dispositivo del anfitrión. El invitado
+   * pide canciones (se agregan a la cola) pero no reproduce, salta ni quita.
+   * Lo activa JamService.
+   */
+  guestMode = false;
+
+  /** Reemplaza toda la cola (al entrar a una sala, se usa la cola de la sala). */
+  resetPlaylist(songs: Song[], currentIndex = -1): void {
+    this.playlist = [...songs];
+    this._currentIndex = currentIndex >= 0 && currentIndex < songs.length ? currentIndex : -1;
+    this.playlist$.next([...this.playlist]);
+    this.currentIndex$.next(this._currentIndex);
+    this.currentSong$.next(this._currentIndex >= 0 ? this.playlist[this._currentIndex] : null);
+  }
+
+  /** `remote`: el cambio viene de la sala (otro participante), no de esta persona. */
+  removeFromPlaylist(index: number, { remote = false } = {}): void {
+    if (this.guestMode && !remote) {
+      this.toast$.next('Solo el anfitrión puede quitar canciones de la sala');
+      return;
+    }
     const wasPlaying = index === this._currentIndex;
     this.playlist.splice(index, 1);
 
@@ -115,6 +136,11 @@ export class PlayerStateService {
 
   play(index: number): void {
     if (index < 0 || index >= this.playlist.length) return;
+    if (this.guestMode) {
+      // Quien llamó ya la agregó a la cola: queda pedida y sonará cuando le toque.
+      this.toast$.next('Pedida 🎶 Sonará en la sala cuando le toque');
+      return;
+    }
     this._currentIndex = index;
     const song = this.playlist[index];
     this.played.add(song.videoId);

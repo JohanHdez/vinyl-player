@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { JamService } from '../../services/jam.service';
 import { PlayerStateService } from '../../services/player-state.service';
+import { ROOM_NAME_IDEAS, RoomStatus, cleanRoomName } from '../../services/my-rooms';
 import { ChatComponent } from '../chat/chat.component';
 import { JamPanelComponent } from '../jam-panel/jam-panel.component';
 import { PlaylistComponent } from '../playlist/playlist.component';
@@ -20,17 +21,31 @@ export class RoomComponent implements OnInit, OnDestroy {
   readonly jam = inject(JamService);
   private readonly state = inject(PlayerStateService);
 
+  readonly ideas = ROOM_NAME_IDEAS;
   readonly name = signal(localStorage.getItem(NAME_KEY) ?? '');
+  readonly roomName = signal('');
   readonly code = signal(this.jam.pendingJamCode());
   readonly error = signal('');
+  readonly mode = signal<'create' | 'join'>(this.jam.pendingJamCode() ? 'join' : 'create');
+  readonly statuses = signal<Map<string, RoomStatus>>(new Map());
   readonly nowPlaying = toSignal(this.state.currentSong$);
 
   ngOnInit(): void {
     this.jam.setRoomVisible(true);
+    void this.refreshStatuses();
   }
 
   ngOnDestroy(): void {
     this.jam.setRoomVisible(false);
+  }
+
+  async refreshStatuses(): Promise<void> {
+    const list = await this.jam.roomsStatus();
+    this.statuses.set(new Map(list.map(s => [s.code, s])));
+  }
+
+  status(code: string): RoomStatus | undefined {
+    return this.statuses().get(code);
   }
 
   private validName(): string | null {
@@ -45,7 +60,9 @@ export class RoomComponent implements OnInit, OnDestroy {
 
   create(): void {
     const name = this.validName();
-    if (name) this.jam.createSession(name);
+    if (!name) return;
+    const room = cleanRoomName(this.roomName()) || `Sala de ${name}`;
+    this.jam.createSession(name, room);
   }
 
   join(): void {
@@ -56,10 +73,21 @@ export class RoomComponent implements OnInit, OnDestroy {
       this.error.set('El código tiene 6 letras o números.');
       return;
     }
-    this.jam.joinSession(code, name, true);
+    this.jam.joinSession(code, name);
   }
 
-  leave(): void {
+  open(code: string): void {
+    if (!this.name().trim()) this.name.set('Anfitrión');
+    this.jam.openMyRoom(code);
+  }
+
+  forget(code: string): void {
+    this.jam.forgetMyRoom(code);
+  }
+
+  /** Vuelve a "Mis salas". Si eres anfitrión, la música de esta sala se pausa. */
+  backToRooms(): void {
     this.jam.leaveSession();
+    void this.refreshStatuses();
   }
 }

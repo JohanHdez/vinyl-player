@@ -1,29 +1,58 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, computed, signal } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { PlayerStateService } from './player-state.service';
 import { YouTubeService } from './youtube.service';
 import { JamParticipant } from '../models/jam-session.model';
 import { Song } from '../models/song.model';
 import { ChatMessage, Reaction } from '../models/chat.model';
+import { MyRoom, RoomStatus, forgetRoom, rememberRoom } from './my-rooms';
 import { PROXY_URL } from './proxy-url';
 
+const KEY_CURRENT = 'vinyl_jam_code';
+const KEY_NAME = 'vinyl_jam_name';
+const KEY_ROOMS = 'vinyl_my_rooms';
+
+function readRooms(): MyRoom[] {
+  try {
+    const data = JSON.parse(localStorage.getItem(KEY_ROOMS) ?? '[]');
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Salas en tiempo real. Reglas (las mismas que aplica el servidor):
+ * - Solo suena en el dispositivo del anfitrión; los invitados son control remoto.
+ * - Una persona puede crear todas las salas que quiera ("Mis salas") y volver
+ *   a cualquiera como anfitrión con la llave guardada en este dispositivo.
+ * - Cada dispositivo está en una sala a la vez.
+ */
 @Injectable({ providedIn: 'root' })
 export class JamService {
   private socket: Socket | null = null;
-  private readonly SERVER_URL = PROXY_URL;
   private suppressEmit = false;
   private syncInterval: ReturnType<typeof setInterval> | null = null;
   private typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private typingNames = new Map<string, string>();
   private lastTypingSent = 0;
+  private roomVisible = false;
+  /** Sala a la que volver si se cae la conexión. */
+  private rejoinCode = '';
 
   isInSession = signal(false);
   isHost = signal(false);
-  listenLocally = signal(true);
+  /** Solo el anfitrión reproduce audio. Se conserva por compatibilidad con los componentes. */
+  listenLocally = computed(() => this.isHost());
+  connected = signal(true);
+  hostOnline = signal(true);
   sessionId = signal('');
   sessionCode = signal('');
+  roomName = signal('');
   participants = signal<JamParticipant[]>([]);
   joinDialogOpen = signal(false);
   pendingJamCode = signal('');
+  myRooms = signal<MyRoom[]>(readRooms());
 
   // ── Chat de la sala ──
   messages = signal<ChatMessage[]>([]);
@@ -31,8 +60,7 @@ export class JamService {
   typing = signal<string[]>([]);
   /** Mensajes nuevos mientras la sala no está a la vista. */
   unread = signal(0);
-  myName = signal(localStorage.getItem('vinyl_jam_name') ?? '');
-  private roomVisible = false;
+  myName = signal(localStorage.getItem(KEY_NAME) ?? '');
 
   /** Mi id en la sala (para alinear mis mensajes a la derecha). */
   get myId(): string {
@@ -43,149 +71,134 @@ export class JamService {
     private state: PlayerStateService,
     private yt: YouTubeService
   ) {
-    // Wire hooks so playlist mutations emit socket events
+    // Los cambios locales de la cola se envían a la sala.
     this.state.onSongAdded = (song: Song) => {
-      if (!this.suppressEmit) this.emitAddSong(song);
+      if (!this.suppressEmit && this.inRoom()) this.socket!.emit('add-song', { song });
     };
     this.state.onSongRemoved = (index: number) => {
-      if (!this.suppressEmit) this.emitRemoveSong(index);
+      if (!this.suppressEmit && this.inRoom() && this.isHost()) this.socket!.emit('remove-song', { index });
     };
-    // Solo el anfitrión reemplaza versiones bloqueadas, y lo comparte con todos.
     this.state.onSongReplaced = (index: number, song: Song) => {
-      if (!this.suppressEmit && this.socket && this.isInSession() && this.isHost()) {
-        this.socket.emit('replace-song', { index, song });
-      }
+      if (!this.suppressEmit && this.inRoom() && this.isHost()) this.socket!.emit('replace-song', { index, song });
     };
     this.state.onSongPlayed = (index: number) => {
-      if (!this.suppressEmit) this.emitPlaySong(index);
+      if (!this.suppressEmit && this.inRoom() && this.isHost()) this.socket!.emit('play-song', { index });
     };
-    this.state.onPaused = (currentTime: number) => {
-      if (!this.suppressEmit) this.emitPause(currentTime);
-    };
-    this.state.onResumed = (currentTime: number) => {
-      if (!this.suppressEmit) this.emitResume(currentTime);
-    };
-    this.state.onSeeked = (currentTime: number) => {
-      if (!this.suppressEmit) this.emitSeek(currentTime);
-    };
+    this.state.onPaused = (currentTime: number) => this.emitPause(currentTime);
+    this.state.onResumed = (currentTime: number) => this.emitResume(currentTime);
+    this.state.onSeeked = (currentTime: number) => this.emitSeek(currentTime);
+  }
+
+  private inRoom(): boolean {
+    return !!this.socket && this.isInSession();
   }
 
   checkUrlForJam(): void {
-    const params = new URLSearchParams(window.location.search);
-    const jamCode = params.get('jam');
+    const jamCode = new URLSearchParams(window.location.search).get('jam');
     if (jamCode) {
-      this.pendingJamCode.set(jamCode);
+      this.pendingJamCode.set(jamCode.toUpperCase());
       this.joinDialogOpen.set(true);
     }
   }
 
-  createSession(name = 'Anfitrión'): void {
-    this.myName.set(name);
-    this.listenLocally.set(true);
+  // ── Entrar y salir ────────────────────────────────────────
+
+  /** Crea una sala nueva con lo que esté en la cola. Sin límite de salas por persona. */
+  createSession(name: string, roomName: string): void {
+    this.setName(name);
     this.connect();
-    // Send current playlist state so guests can sync
-    const playlist = this.state.playlist$.value;
-    const currentIndex = this.state.currentIndex;
-    const currentTime = this.yt.getCurrentTime();
-    const duration = this.yt.getDuration();
-    const isPlaying = this.state.isPlaying$.value;
     this.socket!.emit('create-session', {
       name,
-      playlist,
-      currentIndex,
-      currentTime,
-      duration,
-      isPlaying,
+      roomName,
+      playlist: this.state.playlist$.value,
+      currentIndex: this.state.currentIndex,
     });
   }
 
-  joinSession(code: string, name: string, listenLocally: boolean = true): void {
-    this.myName.set(name);
-    localStorage.setItem('vinyl_jam_name', name);
-    this.listenLocally.set(listenLocally);
+  joinSession(code: string, name: string): void {
+    this.setName(name);
     this.connect();
-    this.socket!.emit('join-session', { code, name, listenLocally });
+    this.socket!.emit('join-session', { code: code.trim().toUpperCase(), name });
+  }
+
+  /** Vuelve a una de "Mis salas" como anfitrión. */
+  openMyRoom(code: string): void {
+    const room = this.myRooms().find(r => r.code === code);
+    if (!room) return;
+    this.connect();
+    this.socket!.emit('rejoin-session', { code, name: this.myName() || 'Anfitrión', hostKey: room.hostKey });
+  }
+
+  forgetMyRoom(code: string): void {
+    this.saveRooms(forgetRoom(this.myRooms(), code));
+  }
+
+  /** Estado de "Mis salas" (si existen, cuántas personas hay, si el anfitrión está). */
+  async roomsStatus(): Promise<RoomStatus[]> {
+    const codes = this.myRooms().map(r => r.code);
+    if (!codes.length) return [];
+    try {
+      const resp = await fetch(`${PROXY_URL}/api/rooms/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codes }),
+      });
+      return resp.ok ? ((await resp.json()).rooms as RoomStatus[]) : [];
+    } catch {
+      return [];
+    }
   }
 
   leaveSession(): void {
     this.stopSyncInterval();
+    this.rejoinCode = '';
     if (this.socket) {
       this.socket.emit('leave-session');
       this.socket.disconnect();
       this.socket = null;
     }
-    this.isInSession.set(false);
-    this.isHost.set(false);
-    this.listenLocally.set(true);
-    this.sessionId.set('');
-    this.sessionCode.set('');
-    this.participants.set([]);
-    this.messages.set([]);
-    this.typing.set([]);
-    this.unread.set(0);
-    localStorage.removeItem('vinyl_jam_code');
-    localStorage.removeItem('vinyl_jam_name');
-    localStorage.removeItem('vinyl_jam_listen');
+    this.resetRoomState();
+    localStorage.removeItem(KEY_CURRENT);
   }
 
+  /** Al recargar la página, vuelve a la sala en la que estaba. */
   attemptRejoin(): void {
-    const code = localStorage.getItem('vinyl_jam_code');
-    const name = localStorage.getItem('vinyl_jam_name');
+    const code = localStorage.getItem(KEY_CURRENT);
+    const name = localStorage.getItem(KEY_NAME);
     if (!code || !name) return;
-    const listen = localStorage.getItem('vinyl_jam_listen') !== 'false';
-    this.listenLocally.set(listen);
+    const hostKey = this.myRooms().find(r => r.code === code)?.hostKey;
     this.connect();
-    this.socket!.emit('rejoin-session', { code, name, listenLocally: listen });
-  }
-
-  switchListenMode(listenLocally: boolean): void {
-    this.listenLocally.set(listenLocally);
-    localStorage.setItem('vinyl_jam_listen', String(listenLocally));
-    if (this.socket && this.isInSession()) {
-      this.socket.emit('update-listen-mode', { listenLocally });
-    }
-    // If switching to local: start playing the current song via YouTube
-    if (listenLocally && this.state.currentIndex >= 0) {
-      const playlist = this.state.playlist$.value;
-      const song = playlist[this.state.currentIndex];
-      if (song) {
-        this.yt.loadVideoThen(song.videoId, () => {
-          const ct = this.state.currentTime$.value;
-          if (ct > 0) this.yt.seekTo(ct);
-          if (!this.state.isPlaying$.value) this.yt.pause();
-        });
-      }
-    }
-    // If switching to remote: stop local YouTube playback
-    if (!listenLocally) {
-      this.yt.pause();
-    }
+    this.socket!.emit('rejoin-session', { code, name, hostKey });
   }
 
   // ── Chat ──────────────────────────────────────────────
 
   sendMessage(text: string): void {
     const clean = text.trim();
-    if (clean && this.socket && this.isInSession()) this.socket.emit('chat-message', { text: clean });
+    if (clean && this.inRoom()) this.socket!.emit('chat-message', { text: clean });
   }
 
   shareSong(song: Song, text = ''): void {
-    if (this.socket && this.isInSession()) {
-      const { videoId, title, channel, duration } = song;
-      this.socket.emit('share-song', { song: { videoId, title, channel, duration }, text });
-    }
+    if (!this.inRoom()) return;
+    const { videoId, title, channel, duration } = song;
+    this.socket!.emit('share-song', { song: { videoId, title, channel, duration }, text });
   }
 
   react(messageId: string, emoji: Reaction): void {
-    if (this.socket && this.isInSession()) this.socket.emit('react', { messageId, emoji });
+    if (this.inRoom()) this.socket!.emit('react', { messageId, emoji });
+  }
+
+  /** Votar adelanta una canción de la cola (o quita el voto). */
+  vote(videoId: string): void {
+    if (this.inRoom()) this.socket!.emit('vote-song', { videoId });
   }
 
   /** Avisa que estoy escribiendo, como máximo una vez cada 2 s. */
   notifyTyping(): void {
     const now = Date.now();
-    if (now - this.lastTypingSent < 2000 || !this.socket || !this.isInSession()) return;
+    if (now - this.lastTypingSent < 2000 || !this.inRoom()) return;
     this.lastTypingSent = now;
-    this.socket.emit('typing');
+    this.socket!.emit('typing');
   }
 
   /** La vista de la sala avisa si está abierta, para contar no leídos. */
@@ -194,9 +207,71 @@ export class JamService {
     if (visible) this.unread.set(0);
   }
 
+  // ── Reproducción (solo anfitrión) ─────────────────────────
+
+  emitPause(currentTime: number): void {
+    if (!this.suppressEmit && this.inRoom() && this.isHost()) this.socket!.emit('pause-song', { currentTime });
+  }
+
+  emitResume(currentTime: number): void {
+    if (!this.suppressEmit && this.inRoom() && this.isHost()) this.socket!.emit('resume-song', { currentTime });
+  }
+
+  emitSeek(currentTime: number): void {
+    if (!this.suppressEmit && this.inRoom() && this.isHost()) this.socket!.emit('seek-song', { currentTime });
+  }
+
+  // ── Internos ──────────────────────────────────────────────
+
+  private setName(name: string): void {
+    this.myName.set(name);
+    localStorage.setItem(KEY_NAME, name);
+  }
+
+  private saveRooms(rooms: MyRoom[]): void {
+    this.myRooms.set(rooms);
+    localStorage.setItem(KEY_ROOMS, JSON.stringify(rooms));
+  }
+
+  private resetRoomState(): void {
+    this.isInSession.set(false);
+    this.isHost.set(false);
+    this.state.guestMode = false;
+    this.sessionId.set('');
+    this.sessionCode.set('');
+    this.roomName.set('');
+    this.participants.set([]);
+    this.messages.set([]);
+    this.typing.set([]);
+    this.unread.set(0);
+    this.hostOnline.set(true);
+  }
+
+  private enterRoom(data: RoomSnapshot): void {
+    this.messages.set(data.messages ?? []);
+    this.sessionId.set(data.sessionId);
+    this.sessionCode.set(data.code);
+    this.roomName.set(data.roomName ?? '');
+    this.participants.set(data.participants ?? []);
+    this.hostOnline.set(data.hostOnline ?? true);
+    this.isHost.set(!!data.isHost);
+    this.isInSession.set(true);
+    this.joinDialogOpen.set(false);
+    this.rejoinCode = data.code;
+    localStorage.setItem(KEY_CURRENT, data.code);
+
+    // Invitado: control remoto, nunca suena en su dispositivo.
+    this.state.guestMode = !data.isHost;
+    if (data.isHost) {
+      this.startSyncInterval();
+    } else {
+      this.stopSyncInterval();
+      this.yt.pause();
+    }
+  }
+
   private receiveMessage(message: ChatMessage): void {
     this.messages.update(list => [...list.slice(-199), message]);
-    // Si escribió, ya no está "escribiendo".
     if (message.authorId) this.clearTyping(message.authorId);
     if (!this.roomVisible && message.authorId !== this.myId && message.type !== 'system') {
       this.unread.update(n => n + 1);
@@ -210,8 +285,6 @@ export class JamService {
     this.typingNames.set(id, name);
   }
 
-  private typingNames = new Map<string, string>();
-
   private clearTyping(id: string): void {
     clearTimeout(this.typingTimers.get(id));
     this.typingTimers.delete(id);
@@ -220,51 +293,15 @@ export class JamService {
     if (name) this.typing.update(names => names.filter(n => n !== name));
   }
 
-  emitPause(currentTime: number): void {
-    if (this.socket && this.isInSession() && this.isHost()) {
-      this.socket.emit('pause-song', { currentTime });
-    }
-  }
-
-  emitResume(currentTime: number): void {
-    if (this.socket && this.isInSession() && this.isHost()) {
-      this.socket.emit('resume-song', { currentTime });
-    }
-  }
-
-  emitSeek(currentTime: number): void {
-    if (this.socket && this.isInSession() && this.isHost()) {
-      this.socket.emit('seek-song', { currentTime });
-    }
-  }
-
-  private emitAddSong(song: Song): void {
-    if (this.socket && this.isInSession()) {
-      this.socket.emit('add-song', { song });
-    }
-  }
-
-  private emitRemoveSong(index: number): void {
-    if (this.socket && this.isInSession()) {
-      this.socket.emit('remove-song', { index });
-    }
-  }
-
-  private emitPlaySong(index: number): void {
-    if (this.socket && this.isInSession()) {
-      this.socket.emit('play-song', { index });
-    }
-  }
-
   private startSyncInterval(): void {
     this.stopSyncInterval();
-    if (!this.isHost()) return;
     this.syncInterval = setInterval(() => {
-      if (this.socket && this.isInSession() && this.isHost()) {
-        const currentTime = this.yt.getCurrentTime();
-        const duration = this.yt.getDuration();
-        const isPlaying = this.state.isPlaying$.value;
-        this.socket.emit('sync-playback', { currentTime, duration, isPlaying });
+      if (this.inRoom() && this.isHost()) {
+        this.socket!.emit('sync-playback', {
+          currentTime: this.yt.getCurrentTime(),
+          duration: this.yt.getDuration(),
+          isPlaying: this.state.isPlaying$.value,
+        });
       }
     }, 5000);
   }
@@ -276,215 +313,151 @@ export class JamService {
     }
   }
 
-  /** Whether this client should control YouTube playback */
-  private get shouldPlayLocally(): boolean {
-    return this.listenLocally() || this.isHost();
+  /** Aplica un cambio que viene de la sala sin reenviarlo. */
+  private remote(fn: () => void): void {
+    this.suppressEmit = true;
+    try {
+      fn();
+    } finally {
+      this.suppressEmit = false;
+    }
   }
 
   private connect(): void {
     if (this.socket) return;
+    this.socket = io(PROXY_URL, { transports: ['websocket', 'polling'] });
+    const socket = this.socket;
 
-    this.socket = io(this.SERVER_URL, {
-      transports: ['websocket', 'polling'],
-    });
-
-    this.socket.on('session-created', (data: { sessionId: string; code: string; messages?: ChatMessage[] }) => {
-      this.messages.set(data.messages ?? []);
-      this.sessionId.set(data.sessionId);
-      this.sessionCode.set(data.code);
-      this.isHost.set(true);
-      this.isInSession.set(true);
-      localStorage.setItem('vinyl_jam_code', data.code);
-      localStorage.setItem('vinyl_jam_name', this.myName());
-      localStorage.setItem('vinyl_jam_listen', 'true');
-      this.startSyncInterval();
-    });
-
-    this.socket.on('session-joined', (data: { sessionId: string; code: string; participants: JamParticipant[]; isHost?: boolean; messages?: ChatMessage[] }) => {
-      this.messages.set(data.messages ?? []);
-      this.sessionId.set(data.sessionId);
-      this.sessionCode.set(data.code);
-      this.isInSession.set(true);
-      this.participants.set(data.participants);
-      this.joinDialogOpen.set(false);
-      if (data.isHost) {
-        this.isHost.set(true);
-        this.listenLocally.set(true);
-        this.startSyncInterval();
+    // Si se cayó la conexión y vuelve, regresa sola a la sala.
+    socket.on('connect', () => {
+      this.connected.set(true);
+      if (this.rejoinCode && this.isInSession()) {
+        const hostKey = this.myRooms().find(r => r.code === this.rejoinCode)?.hostKey;
+        socket.emit('rejoin-session', { code: this.rejoinCode, name: this.myName(), hostKey });
       }
-      const storedName = localStorage.getItem('vinyl_jam_name');
-      if (!storedName) {
-        const me = data.participants.find(p => !p.isHost);
-        localStorage.setItem('vinyl_jam_name', me?.name || 'Invitado');
-      }
-      localStorage.setItem('vinyl_jam_code', data.code);
-      localStorage.setItem('vinyl_jam_listen', String(this.listenLocally()));
+    });
+    socket.on('disconnect', () => {
+      this.connected.set(false);
+      this.stopSyncInterval();
     });
 
-    this.socket.on('participant-joined', (data: { participants: JamParticipant[] }) => {
-      this.participants.set(data.participants);
+    socket.on('session-created', (data: RoomSnapshot & { hostKey: string }) => {
+      this.saveRooms(rememberRoom(this.myRooms(), { code: data.code, name: data.roomName ?? 'Sala', hostKey: data.hostKey, createdAt: Date.now() }));
+      this.enterRoom({ ...data, isHost: true });
     });
 
-    this.socket.on('chat-message', (message: ChatMessage) => this.receiveMessage(message));
+    socket.on('session-joined', (data: RoomSnapshot) => this.enterRoom(data));
 
-    this.socket.on('chat-reaction', (data: { messageId: string; reactions: ChatMessage['reactions'] }) => {
+    socket.on('host-status', (data: { online: boolean }) => this.hostOnline.set(data.online));
+
+    for (const event of ['participant-joined', 'participant-left', 'participant-updated', 'participant-disconnected']) {
+      socket.on(event, (data: { participants: JamParticipant[] }) => this.participants.set(data.participants));
+    }
+
+    socket.on('chat-message', (message: ChatMessage) => this.receiveMessage(message));
+    socket.on('chat-reaction', (data: { messageId: string; reactions: ChatMessage['reactions'] }) => {
       this.messages.update(list => list.map(m => (m.id === data.messageId ? { ...m, reactions: data.reactions } : m)));
     });
+    socket.on('typing', (data: { id: string; name: string }) => this.markTyping(data.id, data.name));
+    socket.on('chat-error', (data: { message: string }) => this.state.toast$.next(data.message));
 
-    this.socket.on('typing', (data: { id: string; name: string }) => this.markTyping(data.id, data.name));
+    // ── Cola ──
+    // El servidor manda la cola completa ya ordenada por votos tras cada cambio.
+    socket.on('queue-updated', (data: { playlist: Song[]; currentIndex: number }) =>
+      this.remote(() => {
+        // El anfitrión conserva la canción que está sonando en su dispositivo.
+        const playingId = this.state.currentSong$.value?.videoId;
+        const index = this.isHost() && playingId ? data.playlist.findIndex(s => s.videoId === playingId) : data.currentIndex;
+        this.state.resetPlaylist(data.playlist, index);
+      })
+    );
+    socket.on('song-added', (data: { song: Song }) =>
+      this.remote(() => {
+        const prev = this.state.suppressToast;
+        this.state.suppressToast = true;
+        this.state.addToPlaylist(data.song);
+        this.state.suppressToast = prev;
+      })
+    );
+    socket.on('song-replaced', (data: { index: number; song: Song }) =>
+      this.remote(() => {
+        this.state.replaceSong(data.index, data.song);
+        if (data.index === this.state.currentIndex && this.isHost()) this.state.play(data.index);
+      })
+    );
+    socket.on('song-removed', (data: { index: number }) =>
+      this.remote(() => this.state.removeFromPlaylist(data.index, { remote: true }))
+    );
 
-    this.socket.on('chat-error', (data: { message: string }) => this.state.toast$.next(data.message));
-
-    this.socket.on('participant-left', (data: { participants: JamParticipant[] }) => {
-      this.participants.set(data.participants);
-    });
-
-    this.socket.on('participant-updated', (data: { participants: JamParticipant[] }) => {
-      this.participants.set(data.participants);
-    });
-
-    this.socket.on('participant-disconnected', (data: { participants: JamParticipant[]; disconnectedName: string }) => {
-      this.participants.set(data.participants);
-      this.state.toast$.next(`${data.disconnectedName} se desconecto (5 min para reconectar)`);
-    });
-
-    this.socket.on('song-added', (data: { song: Song }) => {
-      this.suppressEmit = true;
-      this.state.addToPlaylist(data.song);
-      this.suppressEmit = false;
-    });
-
-    this.socket.on('song-replaced', (data: { index: number; song: Song }) => {
-      this.suppressEmit = true;
-      this.state.replaceSong(data.index, data.song);
-      if (data.index === this.state.currentIndex && this.shouldPlayLocally) this.state.play(data.index);
-      this.suppressEmit = false;
-    });
-
-    this.socket.on('song-removed', (data: { index: number }) => {
-      this.suppressEmit = true;
-      this.state.removeFromPlaylist(data.index);
-      this.suppressEmit = false;
-    });
-
-    this.socket.on('song-played', (data: { index: number }) => {
-      this.suppressEmit = true;
-      if (this.shouldPlayLocally) {
-        this.state.play(data.index);
-      } else {
-        this.state.setCurrentSongDisplay(data.index);
-        this.state.setPlaying(true);
-      }
-      this.suppressEmit = false;
-    });
-
-    this.socket.on('song-paused', (data: { currentTime: number }) => {
-      this.suppressEmit = true;
-      if (this.shouldPlayLocally) {
-        this.yt.seekTo(data.currentTime);
-        this.yt.pause();
-      } else {
+    // ── Reproducción: el anfitrión reproduce; los invitados solo ven qué suena ──
+    socket.on('song-played', (data: { index: number }) =>
+      this.remote(() => {
+        if (this.isHost()) {
+          this.state.play(data.index);
+        } else {
+          this.state.setCurrentSongDisplay(data.index);
+          this.state.setPlaying(true);
+        }
+      })
+    );
+    socket.on('song-paused', (data: { currentTime: number }) =>
+      this.remote(() => {
         this.state.updateTime(data.currentTime, this.state.duration$.value);
         this.state.setPlaying(false);
-      }
-      this.suppressEmit = false;
-    });
-
-    this.socket.on('song-resumed', (data: { currentTime: number }) => {
-      this.suppressEmit = true;
-      if (this.shouldPlayLocally) {
-        this.yt.seekTo(data.currentTime);
-        this.yt.play();
-      } else {
+      })
+    );
+    socket.on('song-resumed', (data: { currentTime: number }) =>
+      this.remote(() => {
         this.state.updateTime(data.currentTime, this.state.duration$.value);
         this.state.setPlaying(true);
-      }
-      this.suppressEmit = false;
+      })
+    );
+    socket.on('song-seeked', (data: { currentTime: number }) =>
+      this.remote(() => this.state.updateTime(data.currentTime, this.state.duration$.value))
+    );
+    socket.on('playback-synced', (data: { currentTime: number; duration?: number; isPlaying: boolean }) => {
+      if (this.isHost()) return;
+      this.state.updateTime(data.currentTime, data.duration || this.state.duration$.value);
+      this.state.setPlaying(data.isPlaying);
     });
 
-    this.socket.on('song-seeked', (data: { currentTime: number }) => {
-      this.suppressEmit = true;
-      if (this.shouldPlayLocally) {
-        this.yt.seekTo(data.currentTime);
-      } else {
-        this.state.updateTime(data.currentTime, this.state.duration$.value);
-      }
-      this.suppressEmit = false;
-    });
-
-    this.socket.on('playback-synced', (data: { currentTime: number; duration?: number; isPlaying: boolean }) => {
-      if (this.shouldPlayLocally) {
-        // Only correct if drift > 2 seconds
-        const localTime = this.yt.getCurrentTime();
-        const drift = Math.abs(localTime - data.currentTime);
-        if (drift > 2) {
-          this.yt.seekTo(data.currentTime);
-        }
-        const localPlaying = this.state.isPlaying$.value;
-        if (data.isPlaying && !localPlaying) {
-          this.yt.play();
-        } else if (!data.isPlaying && localPlaying) {
-          this.yt.pause();
-        }
-      } else {
-        // Remote listening: update display only
-        const duration = data.duration || this.state.duration$.value;
-        this.state.updateTime(data.currentTime, duration);
-        this.state.setPlaying(data.isPlaying);
-      }
-    });
-
-    this.socket.on('sync-state', (data: { playlist: Song[]; currentIndex: number; isPlaying?: boolean; currentTime?: number; duration?: number }) => {
-      this.suppressEmit = true;
-      this.state.suppressToast = true;
-      for (const song of data.playlist) {
-        this.state.addToPlaylist(song);
-      }
-      this.state.suppressToast = false;
-      if (data.currentIndex >= 0) {
-        if (this.shouldPlayLocally) {
-          // Use the current song's videoId to load directly with callback
-          const playlist = this.state.playlist$.value;
-          const song = playlist[data.currentIndex];
-          if (song) {
-            this.state.setCurrentSongDisplay(data.currentIndex);
-            this.yt.loadVideoThen(song.videoId, () => {
-              if (data.currentTime && data.currentTime > 0) {
-                this.yt.seekTo(data.currentTime);
-              }
-              if (data.isPlaying === false) {
-                this.yt.pause();
-              }
-            });
-          }
+    // Al entrar: la cola de la sala reemplaza la local.
+    socket.on('sync-state', (data: { playlist: Song[]; currentIndex: number; isPlaying?: boolean; currentTime?: number; duration?: number }) =>
+      this.remote(() => {
+        this.state.resetPlaylist(data.playlist, -1);
+        if (data.currentIndex < 0 || !data.playlist[data.currentIndex]) return;
+        this.state.setCurrentSongDisplay(data.currentIndex);
+        if (this.isHost()) {
+          // El anfitrión retoma la canción donde iba (en pausa si estaba en pausa).
+          this.yt.loadVideoThen(data.playlist[data.currentIndex].videoId, () => {
+            if (data.currentTime && data.currentTime > 0) this.yt.seekTo(data.currentTime);
+            if (!data.isPlaying) this.yt.pause();
+          });
         } else {
-          // Remote listening: show song info without YouTube
-          this.state.setCurrentSongDisplay(data.currentIndex);
-          if (data.currentTime) {
-            const duration = data.duration || 0;
-            this.state.updateTime(data.currentTime, duration);
-          }
-          this.state.setPlaying(data.isPlaying ?? false);
+          this.state.updateTime(data.currentTime ?? 0, data.duration ?? 0);
+          this.state.setPlaying(!!data.isPlaying);
         }
-      }
-      this.suppressEmit = false;
+      })
+    );
+
+    socket.on('session-expired', (data?: { code?: string }) => {
+      if (data?.code) this.forgetMyRoom(data.code);
+      localStorage.removeItem(KEY_CURRENT);
+      this.rejoinCode = '';
+      this.resetRoomState();
+      this.state.toast$.next('Esa sala ya no existe. Puedes crear una nueva.');
     });
 
-    this.socket.on('session-expired', () => {
-      localStorage.removeItem('vinyl_jam_code');
-      localStorage.removeItem('vinyl_jam_name');
-      localStorage.removeItem('vinyl_jam_listen');
-      this.state.toast$.next('La sesion Jam ha expirado');
-    });
-
-    this.socket.on('error', (data: { message: string }) => {
-      this.state.toast$.next(data.message);
-    });
-
-    this.socket.on('disconnect', () => {
-      this.stopSyncInterval();
-      this.isInSession.set(false);
-      this.isHost.set(false);
-    });
+    socket.on('error', (data: { message: string }) => this.state.toast$.next(data.message));
   }
+}
+
+interface RoomSnapshot {
+  sessionId: string;
+  code: string;
+  roomName?: string;
+  participants?: JamParticipant[];
+  isHost?: boolean;
+  hostOnline?: boolean;
+  messages?: ChatMessage[];
 }

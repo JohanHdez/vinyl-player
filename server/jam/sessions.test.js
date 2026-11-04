@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const http = require("http");
 const { Server } = require("socket.io");
 const { io: connect } = require("socket.io-client");
-const { registerJamHandlers } = require("./sessions");
+const { registerJamHandlers, getRoomsStatus, sessions } = require("./sessions");
 
 let httpServer;
 let io;
@@ -56,16 +56,16 @@ test("las canciones que agrega un participante llegan a los demás", async () =>
   guest.emit("join-session", { code, name: "Luis" });
   await once(guest, "session-joined");
 
-  const received = once(host, "song-added");
+  const received = once(host, "queue-updated");
   guest.emit("add-song", { song: { videoId: "abcdefghijk", title: "T", channel: "C" } });
-  assert.equal((await received).song.videoId, "abcdefghijk");
+  assert.equal((await received).playlist[0].videoId, "abcdefghijk");
 });
 
 test("unirse con un código inexistente devuelve error", async () => {
   const guest = client();
   const err = once(guest, "error");
   guest.emit("join-session", { code: "ZZZZZZ", name: "X" });
-  assert.equal((await err).message, "Sesion no encontrada");
+  assert.match((await err).message, /No encontré esa sala/);
 });
 
 // ── Chat de la sala ───────────────────────────────────────────
@@ -150,7 +150,7 @@ test("solo el anfitrión puede reemplazar una canción bloqueada, y llega a los 
   const { host, guest } = await room();
   const a = { videoId: "K5VZGDyX_qs", title: "Bloqueada", channel: "" };
   host.emit("add-song", { song: a });
-  await once(guest, "song-added");
+  await once(guest, "queue-updated");
 
   // Un invitado no puede reemplazar
   let guestReplaced = false;
@@ -165,4 +165,110 @@ test("solo el anfitrión puede reemplazar una canción bloqueada, y llega a los 
   assert.equal(data.index, 0);
   assert.equal(data.song.videoId, "zSeVzG-n6IQ");
   assert.equal(guestReplaced, false);
+});
+
+// ── Reglas de las salas ───────────────────────────────────────
+
+test("la sala tiene nombre y el anfitrión recibe su llave secreta", async () => {
+  const host = client();
+  host.emit("create-session", { name: "Gym", roomName: "Mañana · cardio" });
+  const created = await once(host, "session-created");
+  assert.equal(created.roomName, "Mañana · cardio");
+  assert.match(created.hostKey, /^[0-9a-f]{32}$/);
+  assert.equal(created.isHost, true);
+});
+
+test("si el anfitrión se va, nadie más toma el control y puede volver con su llave", async () => {
+  const host = client();
+  host.emit("create-session", { name: "Gym", roomName: "Pesas" });
+  const { code, hostKey } = await once(host, "session-created");
+  const guest = client();
+  guest.emit("join-session", { code, name: "Luis" });
+  const joined = await once(guest, "session-joined");
+  assert.equal(joined.isHost, false);
+
+  const offline = once(guest, "host-status");
+  host.emit("leave-session");
+  assert.equal((await offline).online, false);
+  assert.equal(sessions.get(code).hostId, null, "el control no pasa al invitado");
+
+  const back = client();
+  const online = once(guest, "host-status");
+  back.emit("rejoin-session", { code, name: "Gym", hostKey });
+  const snap = await once(back, "session-joined");
+  assert.equal(snap.isHost, true);
+  assert.equal((await online).online, true);
+
+  // Una llave equivocada no da control
+  const intruder = client();
+  intruder.emit("rejoin-session", { code, name: "Gym", hostKey: "0".repeat(32) });
+  assert.equal((await once(intruder, "session-joined")).isHost, false);
+});
+
+test("los invitados piden canciones pero no pueden reproducir ni quitar", async () => {
+  const { host, guest, code } = await room();
+  const song = { videoId: "abcdefghij3", title: "Pedida", channel: "" };
+  const added = once(host, "queue-updated");
+  guest.emit("add-song", { song });
+  assert.equal((await added).playlist[0].addedBy, "Luis");
+
+  guest.emit("play-song", { index: 0 });
+  guest.emit("remove-song", { index: 0 });
+  await new Promise((r) => setTimeout(r, 200));
+  const r = sessions.get(code);
+  assert.equal(r.playlist.length, 1, "el invitado no pudo quitarla");
+  assert.equal(r.currentIndex, -1, "el invitado no pudo reproducirla");
+
+  const played = once(guest, "song-played");
+  host.emit("play-song", { index: 0 });
+  assert.equal((await played).index, 0);
+});
+
+test("crear o entrar a otra sala saca de la anterior (sin anfitriones fantasma)", async () => {
+  const host = client();
+  host.emit("create-session", { name: "Gym", roomName: "Uno" });
+  const first = await once(host, "session-created");
+  host.emit("create-session", { name: "Gym", roomName: "Dos" });
+  const second = await once(host, "session-created");
+  assert.notEqual(first.code, second.code);
+  assert.equal(sessions.get(first.code).hostId, null);
+  assert.equal(sessions.get(first.code).participants.length, 0);
+  assert.equal(sessions.get(second.code).hostId !== null, true);
+});
+
+test("getRoomsStatus informa si cada sala existe y si su anfitrión está", async () => {
+  const host = client();
+  host.emit("create-session", { name: "Gym", roomName: "Estado" });
+  const { code } = await once(host, "session-created");
+  const [ok, missing] = getRoomsStatus([code, "ZZZZZZ"]);
+  assert.deepEqual(ok, { code, exists: true, name: "Estado", people: 1, hostOnline: true });
+  assert.equal(missing.exists, false);
+});
+
+test("compartir en el chat pone la canción en la cola, y los votos la adelantan", async () => {
+  const { host, guest, code } = await room();
+  const song = (id, title) => ({ videoId: id, title, channel: "" });
+  // Nada sonando: el anfitrión pone la primera
+  host.emit("add-song", { song: song("aaaaaaaaaa1", "Uno") });
+  await once(guest, "queue-updated");
+  host.emit("play-song", { index: 0 });
+  await once(guest, "song-played");
+
+  host.emit("add-song", { song: song("aaaaaaaaaa2", "Dos") });
+  await once(guest, "queue-updated");
+  const shared = once(host, "queue-updated");
+  guest.emit("share-song", { song: song("aaaaaaaaaa3", "Tres") });
+  assert.deepEqual((await shared).playlist.map((s) => s.title), ["Uno", "Dos", "Tres"]);
+
+  // Dos votos para "Tres": pasa adelante de "Dos"; "Uno" sigue sonando
+  const voted = new Promise((resolve) => {
+    let n = 0;
+    host.on("queue-updated", (q) => { if (++n === 2) resolve(q); });
+  });
+  guest.emit("vote-song", { videoId: "aaaaaaaaaa3" });
+  host.emit("vote-song", { videoId: "aaaaaaaaaa3" });
+  const q = await voted;
+  assert.deepEqual(q.playlist.map((s) => s.title), ["Uno", "Tres", "Dos"]);
+  assert.equal(q.playlist[1].votes.length, 2);
+  assert.equal(sessions.get(code).currentIndex, 0);
 });

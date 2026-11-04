@@ -207,3 +207,35 @@
   margin-right: 6px;
   vertical-align: 1px;
 }
+
+.vote-hint {
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  padding: 0 16px 8px;
+}
+
+.playlist-item:not(.clickable) { cursor: default; }
+.playlist-item.played { opacity: 0.45; }
+
+.pl-vote {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+
+  span { font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+  &:hover { border-color: var(--accent-brass); }
+  &:active { transform: scale(0.95); }
+  &.voted { background: rgba(200, 152, 76, 0.18); border-color: var(--accent-brass); span { color: var(--accent-bright); } }
+  &:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
+}

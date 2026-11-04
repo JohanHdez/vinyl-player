@@ -190,3 +190,7 @@
     cursor: not-allowed;
   }
 }
+
+.join-explain { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45; margin-bottom: 6px; }
+.field-code { text-transform: uppercase; letter-spacing: 0.3em; font-weight: 600; }
+.join-terms { font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; a { color: var(--accent-bright); } }

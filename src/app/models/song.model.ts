@@ -6,4 +6,8 @@ export interface Song {
   duration?: string;
   /** Cómo llegó a la cola: elegida por alguien o agregada por la radio automática. */
   source?: 'user' | 'radio';
+  /** En una sala: quién la pidió, cuándo, y quiénes votaron por ella. */
+  addedBy?: string;
+  addedAt?: number;
+  votes?: string[];
 }
