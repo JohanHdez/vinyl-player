@@ -1,0 +1,114 @@
+<section class="chat" aria-label="Chat de la sala">
+  <div class="chat-scroll" #scroller (scroll)="onScroll()" aria-live="polite">
+    @if (view().length === 0) {
+      <div class="chat-empty">
+        <p class="font-display">La sala está en silencio</p>
+        <span>Saluda o comparte la canción que estás escuchando.</span>
+      </div>
+    }
+
+    @for (m of view(); track m.id) {
+      @if (m.type === 'system') {
+        <p class="msg-system">{{ m.text }} · {{ time(m.ts) }}</p>
+      } @else {
+        <div class="msg" [class.mine]="m.mine" [class.grouped]="!m.firstOfGroup">
+          @if (!m.mine) {
+            <span class="msg-avatar" [style.background]="color(m.author)" [class.hidden]="!m.firstOfGroup" aria-hidden="true">{{ initial(m.author) }}</span>
+          }
+
+          <div class="msg-body">
+            @if (m.firstOfGroup && !m.mine) {
+              <span class="msg-author">{{ m.author }}</span>
+            }
+
+            <div class="bubble" [class.bubble--song]="m.type === 'song'">
+              @if (m.type === 'song' && m.song; as song) {
+                <div class="song-card">
+                  <img [src]="thumb(song.videoId)" alt="" loading="lazy" />
+                  <div class="song-info">
+                    <span class="song-label">🎵 Compartió una canción</span>
+                    <strong>{{ song.title }}</strong>
+                    <span class="song-channel">{{ song.channel }}</span>
+                  </div>
+                </div>
+                <div class="song-actions">
+                  <button type="button" (click)="playNow(song)">▶ Poner ahora</button>
+                  @if (isQueued(song)) {
+                    <button type="button" disabled>✓ En la cola</button>
+                  } @else {
+                    <button type="button" (click)="addToQueue(song)">+ Cola</button>
+                  }
+                </div>
+              }
+              @if (m.text) {
+                <p class="msg-text">{{ m.text }}</p>
+              }
+              <span class="msg-time">{{ time(m.ts) }}</span>
+            </div>
+
+            @if (m.reactionList.length) {
+              <div class="reactions">
+                @for (r of m.reactionList; track r.emoji) {
+                  <button type="button" class="reaction" [class.mine]="r.mine" (click)="react(m, r.emoji)" [attr.aria-label]="'Reacción ' + r.emoji">
+                    {{ r.emoji }} <span>{{ r.count }}</span>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+
+          <div class="react-picker" role="group" aria-label="Reaccionar">
+            @for (e of reactions; track e) {
+              <button type="button" (click)="react(m, e)" [attr.aria-label]="'Reaccionar con ' + e">{{ e }}</button>
+            }
+          </div>
+        </div>
+      }
+    }
+  </div>
+
+  <p class="typing" aria-live="polite">{{ typingText() }}</p>
+
+  @if (pickerOpen()) {
+    <div class="picker">
+      @if (currentSong(); as song) {
+        <button type="button" class="picker-current" (click)="shareCurrent()">
+          <img [src]="thumb(song.videoId)" alt="" />
+          <span><small>Compartir lo que suena</small>{{ song.title }}</span>
+        </button>
+      }
+      <form class="picker-search" (submit)="$event.preventDefault(); searchSongs()">
+        <input type="search" placeholder="Busca una canción para compartir" [value]="pickerQuery()" (input)="pickerQuery.set($any($event.target).value)" aria-label="Buscar canción para compartir" />
+        <button type="submit">Buscar</button>
+      </form>
+      @if (pickerLoading()) { <p class="picker-hint">Buscando…</p> }
+      <ul class="picker-results">
+        @for (song of pickerResults().slice(0, 6); track song.videoId) {
+          <li>
+            <button type="button" (click)="share(song)">
+              <img [src]="thumb(song.videoId)" alt="" loading="lazy" />
+              <span><strong>{{ song.title }}</strong><small>{{ song.channel }}</small></span>
+            </button>
+          </li>
+        }
+      </ul>
+    </div>
+  }
+
+  <div class="composer">
+    <button type="button" class="composer-music" [class.active]="pickerOpen()" (click)="togglePicker()" title="Compartir una canción" aria-label="Compartir una canción">
+      <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>
+    </button>
+    <textarea
+      rows="1"
+      maxlength="500"
+      placeholder="Escribe un mensaje…"
+      aria-label="Mensaje"
+      [value]="draft()"
+      (input)="onInput($any($event.target).value)"
+      (keydown)="onKeydown($event)"></textarea>
+    <button type="button" class="composer-send" (click)="send()" [disabled]="!draft().trim()" aria-label="Enviar">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" /></svg>
+    </button>
+  </div>
+</section>

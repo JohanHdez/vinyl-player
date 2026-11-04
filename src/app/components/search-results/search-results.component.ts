@@ -10,6 +10,7 @@ import { Song } from '../../models/song.model';
   styleUrl: './search-results.component.scss',
 })
 export class SearchResultsComponent {
+  @Input() heading = 'Resultados de búsqueda';
   @Input() results: Song[] = [];
   @Input() loading = false;
   @Input() visible = false;

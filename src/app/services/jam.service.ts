@@ -4,6 +4,7 @@ import { PlayerStateService } from './player-state.service';
 import { YouTubeService } from './youtube.service';
 import { JamParticipant } from '../models/jam-session.model';
 import { Song } from '../models/song.model';
+import { ChatMessage, Reaction } from '../models/chat.model';
 import { PROXY_URL } from './proxy-url';
 
 @Injectable({ providedIn: 'root' })
@@ -11,7 +12,9 @@ export class JamService {
   private socket: Socket | null = null;
   private readonly SERVER_URL = PROXY_URL;
   private suppressEmit = false;
-  private syncInterval: any = null;
+  private syncInterval: ReturnType<typeof setInterval> | null = null;
+  private typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private lastTypingSent = 0;
 
   isInSession = signal(false);
   isHost = signal(false);
@@ -21,6 +24,20 @@ export class JamService {
   participants = signal<JamParticipant[]>([]);
   joinDialogOpen = signal(false);
   pendingJamCode = signal('');
+
+  // ── Chat de la sala ──
+  messages = signal<ChatMessage[]>([]);
+  /** Nombres de quienes están escribiendo ahora. */
+  typing = signal<string[]>([]);
+  /** Mensajes nuevos mientras la sala no está a la vista. */
+  unread = signal(0);
+  myName = signal(localStorage.getItem('vinyl_jam_name') ?? '');
+  private roomVisible = false;
+
+  /** Mi id en la sala (para alinear mis mensajes a la derecha). */
+  get myId(): string {
+    return this.socket?.id ?? '';
+  }
 
   constructor(
     private state: PlayerStateService,
@@ -56,7 +73,8 @@ export class JamService {
     }
   }
 
-  createSession(): void {
+  createSession(name = 'Anfitrión'): void {
+    this.myName.set(name);
     this.listenLocally.set(true);
     this.connect();
     // Send current playlist state so guests can sync
@@ -66,7 +84,7 @@ export class JamService {
     const duration = this.yt.getDuration();
     const isPlaying = this.state.isPlaying$.value;
     this.socket!.emit('create-session', {
-      name: 'Host',
+      name,
       playlist,
       currentIndex,
       currentTime,
@@ -76,6 +94,8 @@ export class JamService {
   }
 
   joinSession(code: string, name: string, listenLocally: boolean = true): void {
+    this.myName.set(name);
+    localStorage.setItem('vinyl_jam_name', name);
     this.listenLocally.set(listenLocally);
     this.connect();
     this.socket!.emit('join-session', { code, name, listenLocally });
@@ -94,6 +114,9 @@ export class JamService {
     this.sessionId.set('');
     this.sessionCode.set('');
     this.participants.set([]);
+    this.messages.set([]);
+    this.typing.set([]);
+    this.unread.set(0);
     localStorage.removeItem('vinyl_jam_code');
     localStorage.removeItem('vinyl_jam_name');
     localStorage.removeItem('vinyl_jam_listen');
@@ -131,6 +154,64 @@ export class JamService {
     if (!listenLocally) {
       this.yt.pause();
     }
+  }
+
+  // ── Chat ──────────────────────────────────────────────
+
+  sendMessage(text: string): void {
+    const clean = text.trim();
+    if (clean && this.socket && this.isInSession()) this.socket.emit('chat-message', { text: clean });
+  }
+
+  shareSong(song: Song, text = ''): void {
+    if (this.socket && this.isInSession()) {
+      const { videoId, title, channel, duration } = song;
+      this.socket.emit('share-song', { song: { videoId, title, channel, duration }, text });
+    }
+  }
+
+  react(messageId: string, emoji: Reaction): void {
+    if (this.socket && this.isInSession()) this.socket.emit('react', { messageId, emoji });
+  }
+
+  /** Avisa que estoy escribiendo, como máximo una vez cada 2 s. */
+  notifyTyping(): void {
+    const now = Date.now();
+    if (now - this.lastTypingSent < 2000 || !this.socket || !this.isInSession()) return;
+    this.lastTypingSent = now;
+    this.socket.emit('typing');
+  }
+
+  /** La vista de la sala avisa si está abierta, para contar no leídos. */
+  setRoomVisible(visible: boolean): void {
+    this.roomVisible = visible;
+    if (visible) this.unread.set(0);
+  }
+
+  private receiveMessage(message: ChatMessage): void {
+    this.messages.update(list => [...list.slice(-199), message]);
+    // Si escribió, ya no está "escribiendo".
+    if (message.authorId) this.clearTyping(message.authorId);
+    if (!this.roomVisible && message.authorId !== this.myId && message.type !== 'system') {
+      this.unread.update(n => n + 1);
+    }
+  }
+
+  private markTyping(id: string, name: string): void {
+    clearTimeout(this.typingTimers.get(id));
+    this.typingTimers.set(id, setTimeout(() => this.clearTyping(id), 3500));
+    this.typing.update(names => (names.includes(name) ? names : [...names, name]));
+    this.typingNames.set(id, name);
+  }
+
+  private typingNames = new Map<string, string>();
+
+  private clearTyping(id: string): void {
+    clearTimeout(this.typingTimers.get(id));
+    this.typingTimers.delete(id);
+    const name = this.typingNames.get(id);
+    this.typingNames.delete(id);
+    if (name) this.typing.update(names => names.filter(n => n !== name));
   }
 
   emitPause(currentTime: number): void {
@@ -201,18 +282,20 @@ export class JamService {
       transports: ['websocket', 'polling'],
     });
 
-    this.socket.on('session-created', (data: { sessionId: string; code: string }) => {
+    this.socket.on('session-created', (data: { sessionId: string; code: string; messages?: ChatMessage[] }) => {
+      this.messages.set(data.messages ?? []);
       this.sessionId.set(data.sessionId);
       this.sessionCode.set(data.code);
       this.isHost.set(true);
       this.isInSession.set(true);
       localStorage.setItem('vinyl_jam_code', data.code);
-      localStorage.setItem('vinyl_jam_name', 'Host');
+      localStorage.setItem('vinyl_jam_name', this.myName());
       localStorage.setItem('vinyl_jam_listen', 'true');
       this.startSyncInterval();
     });
 
-    this.socket.on('session-joined', (data: { sessionId: string; code: string; participants: JamParticipant[]; isHost?: boolean }) => {
+    this.socket.on('session-joined', (data: { sessionId: string; code: string; participants: JamParticipant[]; isHost?: boolean; messages?: ChatMessage[] }) => {
+      this.messages.set(data.messages ?? []);
       this.sessionId.set(data.sessionId);
       this.sessionCode.set(data.code);
       this.isInSession.set(true);
@@ -234,8 +317,17 @@ export class JamService {
 
     this.socket.on('participant-joined', (data: { participants: JamParticipant[] }) => {
       this.participants.set(data.participants);
-      this.state.toast$.next('Un participante se unio al Jam');
     });
+
+    this.socket.on('chat-message', (message: ChatMessage) => this.receiveMessage(message));
+
+    this.socket.on('chat-reaction', (data: { messageId: string; reactions: ChatMessage['reactions'] }) => {
+      this.messages.update(list => list.map(m => (m.id === data.messageId ? { ...m, reactions: data.reactions } : m)));
+    });
+
+    this.socket.on('typing', (data: { id: string; name: string }) => this.markTyping(data.id, data.name));
+
+    this.socket.on('chat-error', (data: { message: string }) => this.state.toast$.next(data.message));
 
     this.socket.on('participant-left', (data: { participants: JamParticipant[] }) => {
       this.participants.set(data.participants);

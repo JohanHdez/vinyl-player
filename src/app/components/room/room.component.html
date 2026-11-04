@@ -1,0 +1,60 @@
+@if (!jam.isInSession()) {
+  <!-- ═══ PORTADA: crear o unirse ═══ -->
+  <div class="view-header">
+    <h1 class="view-title font-display">Salas</h1>
+    <p class="view-subtitle">Escucha con tus amigos, chatea y armen la cola entre todos, en tiempo real</p>
+  </div>
+
+  <div class="lobby">
+    <label class="lobby-name">
+      <span>Tu nombre</span>
+      <input type="text" maxlength="30" placeholder="¿Cómo te llamamos?" [value]="name()" (input)="name.set($any($event.target).value)" />
+    </label>
+
+    <div class="lobby-cards">
+      <form class="lobby-card" (submit)="$event.preventDefault(); create()">
+        <span class="lobby-icon" aria-hidden="true">＋</span>
+        <h2 class="font-display">Crear una sala</h2>
+        <p>Tú pones la música. Comparte el código o el QR y la gente entra a conversar y sumar canciones.</p>
+        <button type="submit" class="room-btn room-btn--primary">Crear sala</button>
+      </form>
+
+      <form class="lobby-card" (submit)="$event.preventDefault(); join()">
+        <span class="lobby-icon" aria-hidden="true">→</span>
+        <h2 class="font-display">Unirme con un código</h2>
+        <input class="lobby-code" type="text" maxlength="6" placeholder="ABC123" [value]="code()" (input)="code.set($any($event.target).value)" aria-label="Código de la sala" />
+        <button type="submit" class="room-btn">Entrar</button>
+      </form>
+    </div>
+
+    @if (error()) { <p class="lobby-error" role="alert">{{ error() }}</p> }
+  </div>
+} @else {
+  <!-- ═══ DENTRO DE LA SALA ═══ -->
+  <div class="room">
+    <header class="room-header">
+      <div>
+        <span class="room-kicker">Sala</span>
+        <h1 class="font-display">{{ jam.sessionCode() }}</h1>
+      </div>
+      <div class="room-people" aria-label="Personas en la sala">
+        @for (p of jam.participants().slice(0, 5); track p.id) {
+          <span class="room-person" [title]="p.name">{{ p.name.charAt(0).toUpperCase() }}</span>
+        }
+        <span class="room-count">{{ jam.participants().length }} en la sala</span>
+      </div>
+      <div class="room-actions">
+        <button type="button" class="room-btn room-btn--primary" (click)="invite()">Invitar</button>
+        <button type="button" class="room-btn" (click)="leave()">Salir</button>
+      </div>
+    </header>
+
+    <div class="room-grid">
+      <app-chat class="room-chat"></app-chat>
+      <aside class="room-side">
+        <app-jam-panel></app-jam-panel>
+        <app-playlist></app-playlist>
+      </aside>
+    </div>
+  </div>
+}

@@ -97,7 +97,12 @@ docker-compose.yml           # Orquestacion con Docker Compose
 - **PlayerStateService**: estado centralizado con hooks para Jam (onSongAdded, onPaused, etc.). Metodo `setCurrentSongDisplay()` actualiza UI sin disparar YouTube. `playNext()` ya no vuelve al inicio: al final de la cola emite `queueEnded$` (la radio decide si continuar). `autoplay$` se guarda en localStorage (`vinyl.autoplay`).
 - **JamService**: maneja conexion Socket.IO, sincronizacion de playlist y playback entre participantes. Signal `listenLocally` controla si el audio se reproduce localmente o en el host.
 
-### Jam Sessions
+### Salas (Jam Sessions + chat)
+- En la UI se llaman "Salas" (vista `room`). La portada pide nombre y permite crear o unirse con codigo; al entrar, la app cambia sola a la vista de la sala.
+- `JamService` expone `messages`, `typing`, `unread` (signals) y `sendMessage`, `shareSong`, `react`, `notifyTyping` (max. 1 cada 2 s).
+- La logica de presentacion del chat vive en `services/chat-view.ts` (pura, con pruebas).
+
+### Jam Sessions (detalle de sincronizacion)
 - **Crear sesion**: Host genera codigo de 6 caracteres + QR code
 - **Unirse**: Invitados escanean QR o ingresan codigo, eligen nombre y modo de escucha
 - **Modos de escucha**:
@@ -114,6 +119,8 @@ docker-compose.yml           # Orquestacion con Docker Compose
   - `youtube/cache.js` — TTL: related 30 min, trending 15 min
   - `jam/sessions.js` — Socket.IO (sin cambios de comportamiento)
 - Endpoints: POST `/api/search`, `/api/trending`, `/api/video-info`, `/api/related` (radio de YouTube Music: `next` con `playlistId: RDAMVM<videoId>`)
+- Explorar: `/api/explore` (FEmusic_moods_and_genres + artistas de FEmusic_charts, cache 6 h), `/api/category {params}`, `/api/artist {id: UC…}`, `/api/playlist {id: VL…}` (cache 30 min). Parsers en `youtube/explore-parsers.js`, fixtures recortados en `youtube/__fixtures__`.
+- Chat de salas (`jam/chat.js` puro + eventos en `jam/sessions.js`): `chat-message`, `share-song`, `react`, `typing`; el servidor emite `chat-message`, `chat-reaction`, `typing`, `chat-error`. Historial de 100 mensajes enviado en `session-created/joined`. Limite: 8 mensajes / 10 s por persona. Las canciones con `source: 'radio'` no generan aviso en el chat.
 - Valida `videoId` (11 caracteres) y `query` (max. 200); responde 502 si YouTube falla
 - Maneja sesiones Jam en memoria con codigos de 6 caracteres
 - Participantes almacenan `listenLocally` flag

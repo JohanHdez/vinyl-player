@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, HostListener, signal, computed, ChangeDetectorRef, ApplicationRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, signal, computed, effect, ChangeDetectorRef, ApplicationRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { TurntableComponent } from './components/turntable/turntable.component';
@@ -10,13 +10,15 @@ import { TrendingGridComponent } from './components/trending-grid/trending-grid.
 import { JamPanelComponent } from './components/jam-panel/jam-panel.component';
 import { JamJoinComponent } from './components/jam-join/jam-join.component';
 import { SuggestionsComponent } from './components/suggestions/suggestions.component';
+import { ExploreComponent } from './components/explore/explore.component';
+import { RoomComponent } from './components/room/room.component';
 import { YouTubeService } from './services/youtube.service';
 import { PlayerStateService } from './services/player-state.service';
 import { JamService } from './services/jam.service';
 import { RadioService } from './services/radio.service';
 import { Song } from './models/song.model';
 
-export type AppView = 'home' | 'search' | 'nowplaying' | 'library';
+export type AppView = 'home' | 'explore' | 'search' | 'nowplaying' | 'library' | 'room';
 
 @Component({
   selector: 'app-root',
@@ -32,6 +34,8 @@ export type AppView = 'home' | 'search' | 'nowplaying' | 'library';
     JamPanelComponent,
     JamJoinComponent,
     SuggestionsComponent,
+    ExploreComponent,
+    RoomComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
@@ -46,6 +50,7 @@ export class App implements OnInit, OnDestroy {
   trendingSongs = signal<Song[]>([]);
   trendingLoading = signal(false);
   jamActive = computed(() => this.jamService.isInSession());
+  unread = computed(() => this.jamService.unread());
   toastMessage = signal('');
   toastVisible = signal(false);
 
@@ -78,7 +83,15 @@ export class App implements OnInit, OnDestroy {
     readonly radio: RadioService,
     private appRef: ApplicationRef,
     private cdr: ChangeDetectorRef
-  ) {}
+  ) {
+    // Al entrar o crear una sala, muestra la sala.
+    let wasInSession = false;
+    effect(() => {
+      const inSession = this.jamService.isInSession();
+      if (inSession && !wasInSession) this.currentView.set('room');
+      wasInSession = inSession;
+    });
+  }
 
   ngOnInit(): void {
     this.yt.init();
@@ -167,10 +180,6 @@ export class App implements OnInit, OnDestroy {
     const playlist = this.state.playlist$.value;
     const idx = playlist.findIndex(s => s.videoId === song.videoId);
     if (idx >= 0) this.state.play(idx);
-  }
-
-  onStartJam(): void {
-    this.jamService.createSession();
   }
 
   @HostListener('document:keydown', ['$event'])

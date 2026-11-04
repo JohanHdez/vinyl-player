@@ -11,9 +11,20 @@ const {
   parseTrendingResults,
   parseRelatedResults,
 } = require("./youtube/parsers");
+const {
+  parseMoodsAndGenres,
+  parseChartArtists,
+  parseCategoryPage,
+  parseArtistPage,
+  parsePlaylistPage,
+  CHANNEL_ID,
+  PLAYLIST_BROWSE_ID,
+} = require("./youtube/explore-parsers");
 const { TtlCache } = require("./youtube/cache");
 
 const MAX_QUERY_LENGTH = 200;
+/** Los `params` de una categoría son base64 opaco de YouTube. */
+const CATEGORY_PARAMS = /^[\w%=-]{8,200}$/;
 
 /**
  * @param {{ innertube?: typeof defaultInnertube, logger?: Pick<Console, "error"|"warn"> }} [deps]
@@ -90,6 +101,65 @@ function createApiRouter({ innertube = defaultInnertube, logger = console } = {}
     const items = parseRelatedResults(result.data, videoId);
     if (items.length > 0) relatedCache.set(videoId, items);
     res.json({ items });
+  }));
+
+  // ── Explorar ────────────────────────────────────────────────
+  const exploreCache = new TtlCache({ ttlMs: 6 * 60 * 60 * 1000, maxEntries: 1 });
+  const pageCache = new TtlCache({ ttlMs: 30 * 60 * 1000, maxEntries: 300 });
+
+  /** Responde desde caché o calcula, guarda y responde. */
+  const cached = async (cache, key, res, compute) => {
+    const hit = cache.get(key);
+    if (hit) return res.json(hit);
+    const value = await compute();
+    if (value) cache.set(key, value);
+    res.json(value ?? {});
+  };
+
+  // Géneros, estados de ánimo y artistas principales.
+  router.post("/explore", handle("explore", (_req, res) =>
+    cached(exploreCache, "explore", res, async () => {
+      const [moods, charts] = await Promise.all([
+        innertube("browse", { browseId: "FEmusic_moods_and_genres" }, { client: "music" }),
+        innertube("browse", { browseId: "FEmusic_charts" }, { client: "music" }),
+      ]);
+      const sections = moods.status === 200 ? parseMoodsAndGenres(moods.data) : [];
+      const artists = charts.status === 200 ? parseChartArtists(charts.data) : [];
+      return sections.length || artists.length ? { sections, artists } : null;
+    })
+  ));
+
+  router.post("/category", handle("category", (req, res) => {
+    const params = req.body?.params;
+    if (typeof params !== "string" || !CATEGORY_PARAMS.test(params)) {
+      return res.status(400).json({ error: "params inválido" });
+    }
+    return cached(pageCache, `category:${params}`, res, async () => {
+      const r = await innertube(
+        "browse",
+        { browseId: "FEmusic_moods_and_genres_category", params },
+        { client: "music" }
+      );
+      return r.status === 200 ? parseCategoryPage(r.data) : null;
+    });
+  }));
+
+  router.post("/artist", handle("artist", (req, res) => {
+    const id = req.body?.id;
+    if (typeof id !== "string" || !CHANNEL_ID.test(id)) return res.status(400).json({ error: "id de artista inválido" });
+    return cached(pageCache, `artist:${id}`, res, async () => {
+      const r = await innertube("browse", { browseId: id }, { client: "music" });
+      return r.status === 200 ? parseArtistPage(r.data) : null;
+    });
+  }));
+
+  router.post("/playlist", handle("playlist", (req, res) => {
+    const id = req.body?.id;
+    if (typeof id !== "string" || !PLAYLIST_BROWSE_ID.test(id)) return res.status(400).json({ error: "id de lista inválido" });
+    return cached(pageCache, `playlist:${id}`, res, async () => {
+      const r = await innertube("browse", { browseId: id }, { client: "music" });
+      return r.status === 200 ? parsePlaylistPage(r.data) : null;
+    });
   }));
 
   return router;

@@ -1,6 +1,7 @@
 import { Injectable, NgZone } from '@angular/core';
 import { PlayerStateService } from './player-state.service';
 import { Song } from '../models/song.model';
+import { ArtistPage, CategoryPage, ExploreHome, PlaylistPage } from '../models/explore.model';
 import { PROXY_URL } from './proxy-url';
 
 // Tipos mínimos del YouTube IFrame API: solo lo que usamos.
@@ -190,8 +191,8 @@ export class YouTubeService {
     return null;
   }
 
-  /** POST a la API propia; devuelve `items` o [] si algo falla. */
-  private async postItems(endpoint: string, body: object): Promise<Song[]> {
+  /** POST a la API propia; devuelve el JSON o `null` si algo falla. */
+  private async postJson<T>(endpoint: string, body: object): Promise<T | null> {
     try {
       const resp = await fetch(`${PROXY_URL}/api/${endpoint}`, {
         method: 'POST',
@@ -199,12 +200,33 @@ export class YouTubeService {
         body: JSON.stringify(body),
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data: { items?: Song[] } = await resp.json();
-      return data.items ?? [];
+      return (await resp.json()) as T;
     } catch (err) {
       console.error(`[api/${endpoint}]`, err);
-      return [];
+      return null;
     }
+  }
+
+  private async postItems(endpoint: string, body: object): Promise<Song[]> {
+    return (await this.postJson<{ items?: Song[] }>(endpoint, body))?.items ?? [];
+  }
+
+  // --- Explorar ---
+
+  fetchExplore(): Promise<ExploreHome | null> {
+    return this.postJson<ExploreHome>('explore', {});
+  }
+
+  fetchCategory(params: string): Promise<CategoryPage | null> {
+    return this.postJson<CategoryPage>('category', { params });
+  }
+
+  fetchArtist(id: string): Promise<ArtistPage | null> {
+    return this.postJson<ArtistPage>('artist', { id });
+  }
+
+  fetchPlaylist(id: string): Promise<PlaylistPage | null> {
+    return this.postJson<PlaylistPage>('playlist', { id });
   }
 
   search(query: string): Promise<Song[]> {

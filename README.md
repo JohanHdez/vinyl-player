@@ -10,6 +10,8 @@ Reproductor de musica web con estetica de tocadiscos vintage. Busca y reproduce 
 - **Radio automatica** — Al acabarse la cola, sigue sola con canciones parecidas a la que sonaba (se puede apagar; la preferencia se recuerda)
 - **Sugerencias "Porque escuchas..."** — Canciones parecidas a la actual para reproducir ya o agregar a la cola, y una fila "Mas como..." en Inicio
 - **Tendencias** — Grid de canciones en tendencia desde YouTube Music
+- **Explorar** — Generos y estados de animo (como YouTube Music), artistas principales, paginas de artista con sus canciones mas escuchadas y artistas parecidos, y listas destacadas por categoria
+- **Salas** — Chat en tiempo real tipo Messenger: burbujas, "esta escribiendo...", reacciones, canciones compartidas como tarjetas con "Poner ahora" / "+ Cola", avisos de quien entra o agrega musica, historial para quien llega tarde y contador de no leidos
 - **Jam Sessions** — Sesiones colaborativas en tiempo real:
   - Crea una sesion y comparte el codigo QR
   - Los invitados escanean el QR o ingresan el codigo
@@ -111,6 +113,9 @@ src/app/
 │   ├── playlist/         # Cola de reproduccion
 │   ├── trending-grid/    # Tendencias y fila "Mas como..."
 │   ├── suggestions/      # Panel "Porque escuchas..." + interruptor de radio
+│   ├── explore/          # Explorar: generos, artistas, categorias y listas
+│   ├── room/             # Salas: portada (crear/unirse) y layout de la sala
+│   ├── chat/             # Chat tipo Messenger de la sala
 │   ├── jam-panel/        # Panel de sesion Jam (QR, participantes)
 │   └── jam-join/         # Dialog para unirse a Jam
 ├── services/
@@ -118,18 +123,21 @@ src/app/
 │   ├── player-state.service.ts  # Estado global
 │   ├── radio.service.ts         # Sugerencias y radio automatica
 │   ├── queue.ts                 # Reglas de la cola (funciones puras + queue.spec.ts)
+│   ├── chat-view.ts             # Agrupar mensajes y reacciones (puro + chat-view.spec.ts)
 │   ├── jam.service.ts           # Socket.IO / Jam
 │   └── proxy-url.ts             # URL del proxy
 └── models/
 
 server/
 ├── proxy.js             # Punto de entrada: Express + Socket.IO + build de Angular
-├── api.js               # Rutas /api (search, trending, video-info, related)
+├── api.js               # Rutas /api (search, trending, video-info, related, explore, category, artist, playlist)
 ├── youtube/
 │   ├── innertube.js     # Cliente InnerTube (sin API key, con timeout)
 │   ├── parsers.js       # Respuestas de YouTube -> Song[] (funciones puras)
+│   ├── explore-parsers.js # Generos, artistas, categorias y listas
 │   └── cache.js         # Cache en memoria con TTL
-├── jam/sessions.js      # Sesiones Jam en tiempo real
+├── jam/sessions.js      # Salas en tiempo real (cola, reproduccion y chat)
+├── jam/chat.js          # Chat: validacion, historial, reacciones y limite anti-spam
 └── tunnel.js            # Script de ngrok
 
 Dockerfile           # Multi-stage build (Angular + Node.js)

@@ -3,7 +3,25 @@
 // Sesiones Jam: varias personas comparten una cola y la reproducción en tiempo
 // real vía Socket.IO. El estado vive en memoria (se pierde al reiniciar).
 
+const chat = require("./chat");
+
 const sessions = new Map();
+// 8 mensajes cada 10 s por persona: suficiente para conversar, corta el spam.
+const chatLimiter = new chat.RateLimiter({ limit: 8, windowMs: 10_000 });
+
+/** Agrega un mensaje al historial de la sala y lo envía a todos (incluido quien lo mandó). */
+function postMessage(io, session, message) {
+  chat.appendMessage(session.messages, message);
+  io.to(session.sessionId).emit("chat-message", message);
+}
+
+function systemMessage(io, session, text) {
+  postMessage(io, session, chat.createMessage({ type: "system", author: "", text }));
+}
+
+function participantOf(session, socketId) {
+  return session.participants.find((p) => p.id === socketId);
+}
 
 function generateCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -21,7 +39,7 @@ io.on("connection", (socket) => {
   socket.on("create-session", ({ name, playlist, currentIndex, currentTime, duration, isPlaying }) => {
     const code = generateCode();
     const sessionId = `jam_${code}`;
-    const participant = { id: socket.id, name: name || "Host", isHost: true };
+    const participant = { id: socket.id, name: chat.cleanName(name, "Host"), isHost: true };
     const session = {
       sessionId,
       code,
@@ -33,11 +51,13 @@ io.on("connection", (socket) => {
       currentTime: currentTime || 0,
       duration: duration || 0,
       lastUpdated: Date.now(),
+      messages: [],
     };
     sessions.set(code, session);
     currentSession = code;
     socket.join(sessionId);
-    socket.emit("session-created", { sessionId, code });
+    socket.emit("session-created", { sessionId, code, messages: session.messages });
+    systemMessage(io, session, `${participant.name} abrió la sala`);
     io.to(sessionId).emit("participant-joined", {
       participants: session.participants,
     });
@@ -51,7 +71,7 @@ io.on("connection", (socket) => {
     }
     const participant = {
       id: socket.id,
-      name: name || "Invitado",
+      name: chat.cleanName(name),
       isHost: false,
       listenLocally: listenLocally !== false,
     };
@@ -62,7 +82,9 @@ io.on("connection", (socket) => {
       sessionId: session.sessionId,
       code: session.code,
       participants: session.participants,
+      messages: session.messages,
     });
+    systemMessage(io, session, `${participant.name} se unió a la sala`);
     // Sync existing state to new participant
     let estimatedTime = session.currentTime;
     if (session.isPlaying && session.lastUpdated) {
@@ -87,7 +109,50 @@ io.on("connection", (socket) => {
     // Broadcast to all others in the session
     socket.to(session.sessionId).emit("song-added", { song });
     session.playlist.push(song);
+    // Avisa en el chat quién agregó qué (salvo lo que agrega la radio, para no llenar el chat).
+    const who = participantOf(session, socket.id);
+    const clean = chat.cleanSong(song);
+    if (who && clean && song.source !== "radio") {
+      systemMessage(io, session, `${who.name} agregó «${clean.title}» a la cola`);
+    }
   });
+
+  // ── Chat de la sala ─────────────────────────────────────
+  const withSession = (handler) => (payload = {}) => {
+    const session = currentSession && sessions.get(currentSession);
+    const me = session && participantOf(session, socket.id);
+    if (!session || !me) return;
+    handler(session, me, payload);
+  };
+
+  const allowed = () => {
+    if (chatLimiter.allow(socket.id)) return true;
+    socket.emit("chat-error", { message: "Vas muy rápido. Espera unos segundos." });
+    return false;
+  };
+
+  socket.on("chat-message", withSession((session, me, { text }) => {
+    const clean = chat.cleanText(text);
+    if (!clean || !allowed()) return;
+    postMessage(io, session, chat.createMessage({ type: "text", author: me.name, authorId: me.id, text: clean }));
+  }));
+
+  socket.on("share-song", withSession((session, me, { song, text }) => {
+    const clean = chat.cleanSong(song);
+    if (!clean || !allowed()) return;
+    postMessage(io, session, chat.createMessage({
+      type: "song", author: me.name, authorId: me.id, song: clean, text: chat.cleanText(text) || "",
+    }));
+  }));
+
+  socket.on("react", withSession((session, me, { messageId, emoji }) => {
+    const updated = chat.toggleReaction(session.messages, messageId, emoji, me.id);
+    if (updated) io.to(session.sessionId).emit("chat-reaction", { messageId, reactions: updated.reactions });
+  }));
+
+  socket.on("typing", withSession((session, me) => {
+    socket.to(session.sessionId).emit("typing", { id: me.id, name: me.name });
+  }));
 
   socket.on("remove-song", ({ index }) => {
     if (!currentSession) return;
@@ -213,6 +278,7 @@ io.on("connection", (socket) => {
       code: session.code,
       participants: session.participants.filter((p) => !p.disconnectedAt),
       isHost: session.hostId === socket.id,
+      messages: session.messages,
     });
     // Sync state
     let estimatedTime = session.currentTime;
@@ -239,6 +305,8 @@ function handleLeaveImmediate(io, socket, code) {
   if (!code) return;
   const session = sessions.get(code);
   if (!session) return;
+  chatLimiter.forget(socket.id);
+  const leaving = participantOf(session, socket.id);
 
   session.participants = session.participants.filter(
     (p) => p.id !== socket.id
@@ -261,6 +329,7 @@ function handleLeaveImmediate(io, socket, code) {
   io.to(session.sessionId).emit("participant-left", {
     participants: session.participants.filter((p) => !p.disconnectedAt),
   });
+  if (leaving) systemMessage(io, session, `${leaving.name} salió de la sala`);
 }
 
 // Graceful disconnect with 5 min grace period
@@ -304,6 +373,7 @@ function handleDisconnectGraceful(io, socket, code) {
     io.to(sess.sessionId).emit("participant-left", {
       participants: sess.participants.filter((pp) => !pp.disconnectedAt),
     });
+    systemMessage(io, sess, `${p.name} salió de la sala`);
   }, 5 * 60 * 1000);
   // No retiene el proceso solo por este temporizador (permite cerrar pruebas y apagados limpios).
   participant.disconnectTimer.unref?.();

@@ -1,0 +1,172 @@
+@if (canGoBack()) {
+  <button type="button" class="ex-back" (click)="back()">
+    <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" /></svg>
+    Atrás
+  </button>
+}
+
+@switch (page().kind) {
+  <!-- ═══ INICIO DE EXPLORAR ═══ -->
+  @case ('home') {
+    <div class="view-header">
+      <h1 class="view-title font-display">Explorar</h1>
+      <p class="view-subtitle">Géneros, estados de ánimo y los artistas que más suenan</p>
+    </div>
+
+    @if (loading() && !home()) {
+      <div class="ex-chips">
+        @for (_ of [1, 2, 3, 4, 5, 6, 7, 8]; track $index) { <span class="ex-chip ex-chip--skeleton"></span> }
+      </div>
+    } @else if (failed()) {
+      <p class="ex-empty">No pude cargar Explorar. Revisa tu conexión e inténtalo de nuevo.</p>
+    }
+
+    @if (home(); as h) {
+      @if (h.artists.length) {
+        <section class="ex-section">
+          <h2 class="ex-heading">Artistas principales</h2>
+          <div class="ex-artists">
+            @for (artist of h.artists; track artist.id) {
+              <button type="button" class="ex-artist" (click)="openArtist(artist)">
+                <span class="ex-avatar">
+                  @if (artist.thumb) { <img [src]="artist.thumb" [alt]="artist.name" loading="lazy" referrerpolicy="no-referrer" /> }
+                  @else { {{ initials(artist.name) }} }
+                </span>
+                <span class="ex-artist-name">{{ artist.name }}</span>
+              </button>
+            }
+          </div>
+        </section>
+      }
+
+      @for (section of h.sections; track section.title) {
+        <section class="ex-section">
+          <h2 class="ex-heading">{{ section.title }}</h2>
+          <div class="ex-chips">
+            @for (cat of section.items; track cat.params) {
+              <button type="button" class="ex-chip" [style.--stripe]="cat.color" (click)="openCategory(cat)">{{ cat.title }}</button>
+            }
+          </div>
+        </section>
+      }
+    }
+  }
+
+  <!-- ═══ CATEGORÍA ═══ -->
+  @case ('category') {
+    @if (page(); as p) {
+      @if (p.kind === 'category') {
+        <div class="ex-hero" [style.--stripe]="p.category.color">
+          <span class="ex-hero-kicker">Categoría</span>
+          <h1 class="view-title font-display">{{ p.category.title }}</h1>
+          @if (p.data?.songs?.length) {
+            <div class="ex-actions">
+              <button type="button" class="ex-btn ex-btn--primary" (click)="playAll(p.data?.songs)">▶ Reproducir</button>
+              <button type="button" class="ex-btn" (click)="queueAll(p.data?.songs)">Agregar todo a la cola</button>
+            </div>
+          }
+        </div>
+
+        @if (loading()) { <p class="ex-loading">Cargando {{ p.category.title }}…</p> }
+        @if (failed()) { <p class="ex-empty">No pude cargar esta categoría.</p> }
+
+        @if (p.data; as d) {
+          @if (d.playlists.length) {
+            <section class="ex-section">
+              <h2 class="ex-heading">Listas destacadas</h2>
+              <div class="ex-cards">
+                @for (pl of d.playlists; track pl.id) {
+                  <button type="button" class="ex-card" (click)="openPlaylist(pl)">
+                    <img [src]="pl.thumb" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                    <span class="ex-card-title">{{ pl.title }}</span>
+                    <span class="ex-card-sub">{{ pl.subtitle }}</span>
+                  </button>
+                }
+              </div>
+            </section>
+          }
+          @if (d.songs.length) {
+            <app-trending-grid heading="Canciones" [songs]="d.songs" (playNow)="playNow($event)" (addToPlaylist)="add($event)"></app-trending-grid>
+          }
+        }
+      }
+    }
+  }
+
+  <!-- ═══ ARTISTA ═══ -->
+  @case ('artist') {
+    @if (page(); as p) {
+      @if (p.kind === 'artist') {
+        <div class="ex-artist-hero">
+          <span class="ex-avatar ex-avatar--big">
+            @if (p.data?.thumb || p.artist.thumb) {
+              <img [src]="p.data?.thumb || p.artist.thumb" [alt]="p.artist.name" referrerpolicy="no-referrer" />
+            } @else { {{ initials(p.artist.name) }} }
+          </span>
+          <div>
+            <span class="ex-hero-kicker">Artista</span>
+            <h1 class="view-title font-display">{{ p.data?.name || p.artist.name }}</h1>
+            @if (p.data?.songs?.length) {
+              <div class="ex-actions">
+                <button type="button" class="ex-btn ex-btn--primary" (click)="playAll(p.data?.songs)">▶ Reproducir</button>
+                <button type="button" class="ex-btn" (click)="queueAll(p.data?.songs)">Agregar todo a la cola</button>
+              </div>
+            }
+          </div>
+        </div>
+
+        @if (loading()) { <p class="ex-loading">Cargando a {{ p.artist.name }}…</p> }
+        @if (failed()) { <p class="ex-empty">No pude cargar este artista.</p> }
+
+        @if (p.data; as d) {
+          <section class="ex-section">
+            <app-search-results heading="Las más escuchadas" [results]="d.songs" [visible]="true" (playNow)="playNow($event)" (addToPlaylist)="add($event)"></app-search-results>
+          </section>
+          @if (d.related.length) {
+            <section class="ex-section">
+              <h2 class="ex-heading">Puede que también te guste</h2>
+              <div class="ex-artists">
+                @for (artist of d.related; track artist.id) {
+                  <button type="button" class="ex-artist" (click)="openArtist(artist)">
+                    <span class="ex-avatar">
+                      @if (artist.thumb) { <img [src]="artist.thumb" [alt]="artist.name" loading="lazy" referrerpolicy="no-referrer" /> }
+                      @else { {{ initials(artist.name) }} }
+                    </span>
+                    <span class="ex-artist-name">{{ artist.name }}</span>
+                  </button>
+                }
+              </div>
+            </section>
+          }
+        }
+      }
+    }
+  }
+
+  <!-- ═══ LISTA ═══ -->
+  @case ('playlist') {
+    @if (page(); as p) {
+      @if (p.kind === 'playlist') {
+        <div class="ex-artist-hero">
+          <img class="ex-cover" [src]="p.playlist.thumb" alt="" referrerpolicy="no-referrer" />
+          <div>
+            <span class="ex-hero-kicker">Lista</span>
+            <h1 class="view-title font-display">{{ p.data?.title || p.playlist.title }}</h1>
+            <p class="view-subtitle">{{ p.playlist.subtitle }}</p>
+            @if (p.data?.songs?.length) {
+              <div class="ex-actions">
+                <button type="button" class="ex-btn ex-btn--primary" (click)="playAll(p.data?.songs)">▶ Reproducir</button>
+                <button type="button" class="ex-btn" (click)="queueAll(p.data?.songs)">Agregar {{ p.data?.songs?.length }} a la cola</button>
+              </div>
+            }
+          </div>
+        </div>
+        @if (loading()) { <p class="ex-loading">Cargando la lista…</p> }
+        @if (failed()) { <p class="ex-empty">No pude cargar esta lista.</p> }
+        @if (p.data; as d) {
+          <app-search-results [heading]="d.songs.length + ' canciones'" [results]="d.songs" [visible]="true" (playNow)="playNow($event)" (addToPlaylist)="add($event)"></app-search-results>
+        }
+      }
+    }
+  }
+}

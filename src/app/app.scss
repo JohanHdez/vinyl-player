@@ -706,3 +706,20 @@
 
 // Deja espacio para que el botón flotante de Jam no tape las sugerencias.
 .view-nowplaying { padding-bottom: 96px; }
+
+// Contador de mensajes sin leer en "Salas"
+.nav-badge {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-red);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: inline-grid;
+  place-items: center;
+}
+
+.view-room { padding-bottom: 0; }
