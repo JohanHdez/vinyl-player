@@ -15,7 +15,7 @@
 const crypto = require("crypto");
 const chat = require("./chat");
 const { createRoomStore } = require("./store");
-const { orderQueue, toggleVote } = require("./queue-order");
+const { orderQueue, toggleVote, playNow } = require("./queue-order");
 
 const ROOM_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const GUEST_GRACE_MS = 5 * 60 * 1000;
@@ -310,9 +310,11 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
     socket.on("play-song", ({ index } = {}) => {
       const room = current();
       if (!isHostOf(room) || !Number.isInteger(index) || index < 0 || index >= room.playlist.length) return;
-      Object.assign(room, { currentIndex: index, isPlaying: true, currentTime: 0, lastUpdated: Date.now() });
-      socket.to(room.sessionId).emit("song-played", { index });
+      const playing = playNow(room.playlist, room.currentIndex, index);
+      Object.assign(room, { currentIndex: playing, isPlaying: true, currentTime: 0, lastUpdated: Date.now() });
+      // Primero la cola reordenada y luego qué suena, para que el índice coincida.
       broadcastQueue(room);
+      socket.to(room.sessionId).emit("song-played", { index: room.currentIndex });
     });
 
     socket.on("replace-song", ({ index, song } = {}) => {

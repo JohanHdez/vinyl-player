@@ -2,7 +2,7 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { orderQueue, toggleVote } = require("./queue-order");
+const { orderQueue, toggleVote, playNow } = require("./queue-order");
 
 const s = (id, extra = {}) => ({ videoId: id, title: id, ...extra });
 const ids = (list) => list.map((x) => x.videoId);
@@ -39,5 +39,33 @@ test("toggleVote pone y quita el voto; no se vota lo que ya suena", () => {
 test("orderQueue no modifica la cola original", () => {
   const list = [s("a"), s("b", { votes: ["u"] })];
   orderQueue(list, -1);
+  assert.deepEqual(ids(list), ["a", "b"]);
+});
+
+test("playNow: elegir una canción de más abajo no da por sonadas las que se saltó", () => {
+  const list = [s("sono"), s("suena"), s("a"), s("b"), s("elegida"), s("c")];
+  const current = playNow(list, 1, 4);
+  assert.equal(current, 2);
+  assert.deepEqual(ids(list), ["sono", "suena", "elegida", "a", "b", "c"]);
+  // Las que esperaban siguen después de la actual, listas para votar
+  assert.deepEqual(ids(list.slice(current + 1)), ["a", "b", "c"]);
+});
+
+test("playNow: volver a poner una que ya sonó la trae al frente sin mover el historial", () => {
+  const list = [s("vieja"), s("otra"), s("suena"), s("a")];
+  const current = playNow(list, 2, 0);
+  assert.deepEqual(ids(list), ["otra", "suena", "vieja", "a"]);
+  assert.equal(current, 2);
+});
+
+test("playNow: sin nada sonando la elegida queda de primera", () => {
+  const list = [s("a"), s("b"), s("c")];
+  assert.equal(playNow(list, -1, 2), 0);
+  assert.deepEqual(ids(list), ["c", "a", "b"]);
+});
+
+test("playNow: la misma que suena solo vuelve a empezar", () => {
+  const list = [s("a"), s("b")];
+  assert.equal(playNow(list, 1, 1), 1);
   assert.deepEqual(ids(list), ["a", "b"]);
 });

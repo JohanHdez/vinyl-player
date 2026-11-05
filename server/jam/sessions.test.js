@@ -322,3 +322,29 @@ test("una versión reemplazada recuerda el id original", async () => {
   const q = await updated;
   assert.deepEqual(q.playlist[0].replacedFrom, ["K5VZGDyX_qs"]);
 });
+
+test("si el anfitrión pone a mano una canción de más abajo, las que se saltó siguen en espera", async () => {
+  const { host, guest, code } = await room();
+  const song = (id, title) => ({ videoId: id, title, channel: "" });
+  for (const [id, title] of [["bbbbbbbbbb1", "Uno"], ["bbbbbbbbbb2", "Dos"], ["bbbbbbbbbb3", "Tres"], ["bbbbbbbbbb4", "Cuatro"]]) {
+    host.emit("add-song", { song: song(id, title) });
+    await once(guest, "queue-updated");
+  }
+  host.emit("play-song", { index: 0 });
+  await once(guest, "song-played");
+
+  // Salta de "Uno" a "Cuatro": "Dos" y "Tres" no sonaron
+  const queue = once(guest, "queue-updated");
+  const played = once(guest, "song-played");
+  host.emit("play-song", { index: 3 });
+  const q = await queue;
+  assert.deepEqual(q.playlist.map((s) => s.title), ["Uno", "Cuatro", "Dos", "Tres"]);
+  assert.equal(q.currentIndex, 1);
+  assert.equal((await played).index, 1);
+  assert.equal(sessions.get(code).currentIndex, 1);
+
+  // Y se pueden seguir votando
+  const voted = once(guest, "queue-updated");
+  guest.emit("vote-song", { videoId: "bbbbbbbbbb3" });
+  assert.deepEqual((await voted).playlist.map((s) => s.title), ["Uno", "Cuatro", "Tres", "Dos"]);
+});

@@ -45,4 +45,19 @@ function toggleVote(playlist, currentIndex, videoId, voterId) {
   return true;
 }
 
-module.exports = { orderQueue, toggleVote, voteCount };
+/**
+ * El anfitrión elige a mano la canción `index`: se mueve justo después de lo que
+ * sonaba y pasa a ser la actual. Así las que se saltó siguen esperando su turno
+ * en vez de quedar marcadas como si ya hubieran sonado. Modifica la cola.
+ * @returns {number} el nuevo índice de lo que suena
+ */
+function playNow(playlist, currentIndex, index) {
+  if (index === currentIndex) return index;
+  const [song] = playlist.splice(index, 1);
+  const before = index < currentIndex ? currentIndex - 1 : currentIndex;
+  const target = before + 1;
+  playlist.splice(target, 0, song);
+  return target;
+}
+
+module.exports = { orderQueue, toggleVote, playNow, voteCount };
