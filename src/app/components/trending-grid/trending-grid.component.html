@@ -1,7 +1,7 @@
 <div class="trending-section">
   <div class="trending-header">
     <svg viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
-    <span class="header-text">{{ heading }}</span>
+    <h2 class="header-text">{{ heading }}</h2>
   </div>
 
   @if (loading) {
@@ -24,8 +24,10 @@
   } @else {
     <div class="trending-grid">
       @for (song of songs; track song.videoId; let i = $index) {
-        <div class="trending-card" role="button" tabindex="0" [attr.aria-label]="'Reproducir ' + song.title" (click)="onPlay(song)" (keydown.enter)="onPlay(song)" [style.animation-delay]="(i * 50) + 'ms'">
-          <div class="card-thumb-wrap">
+        <!-- La tarjeta entera responde al clic; el teclado y los lectores de pantalla usan el botón de
+             la miniatura. El "+" es un botón hermano, no anidado (un botón dentro de otro no es válido). -->
+        <div class="trending-card" (click)="onPlay(song)" [style.animation-delay]="(i * 50) + 'ms'">
+          <button type="button" class="card-thumb-wrap card-play" [attr.aria-label]="'Reproducir ' + song.title">
             <img [src]="thumbUrl(song.videoId)" alt="" class="card-thumb" loading="lazy">
             <div class="card-overlay">
               <div class="play-circle">
@@ -33,7 +35,7 @@
               </div>
             </div>
             <div class="card-gradient"></div>
-          </div>
+          </button>
           <div class="card-info">
             <div class="card-title">{{ song.title }}</div>
             <div class="card-meta">

@@ -17,6 +17,8 @@
   }
 
   .header-text {
+    margin: 0;
+    font: inherit;
     background: linear-gradient(90deg, var(--accent-brass), var(--accent-bright));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -85,6 +87,26 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.card-play {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-brass);
+    outline-offset: -2px;
+  }
+}
+
+.trending-card:focus-within .card-add-btn,
+.card-add-btn:focus-visible {
+  opacity: 1;
 }
 
 .card-thumb-wrap {
