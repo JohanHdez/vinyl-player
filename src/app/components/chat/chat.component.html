@@ -39,7 +39,7 @@
                     }
                     @case ('upcoming') {
                       @if (st.kind === 'upcoming') {
-                        @if (jam.isHost()) {
+                        @if (jam.isHost() || jam.isCohost()) {
                           <button type="button" (click)="playNow(st.song)">▶ Poner ahora</button>
                         }
                         <button type="button" class="vote" [class.voted]="votedByMe(st.song)" (click)="vote(st.song)"

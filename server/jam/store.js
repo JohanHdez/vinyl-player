@@ -13,6 +13,7 @@ function serializeRoom(room) {
     code: room.code,
     name: room.name,
     hostKey: room.hostKey,
+    cohostKeys: room.cohostKeys,
     playlist: room.playlist,
     currentIndex: room.currentIndex,
     messages: room.messages,

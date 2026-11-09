@@ -45,7 +45,7 @@ export class PlayerControlsComponent implements OnInit, OnDestroy {
 
   controlsDisabled = computed(() =>
     // Los invitados nunca controlan la música de la sala (aunque la escuchen aquí).
-    this.jam.isInSession() && !this.jam.isHost()
+    !this.jam.canControl()
   );
 
   hoverPercent = signal(0);
@@ -83,6 +83,8 @@ export class PlayerControlsComponent implements OnInit, OnDestroy {
       return;
     }
     if (!this.currentSong()) return;
+    // Co-anfitrión: la música suena en el dispositivo del anfitrión.
+    if (this.jam.isCohost()) return this.jam.command('toggle');
     if (this.isPlaying()) {
       const ct = this.yt.getCurrentTime();
       this.yt.pause();
@@ -96,11 +98,13 @@ export class PlayerControlsComponent implements OnInit, OnDestroy {
 
   next(): void {
     if (this.controlsDisabled()) return;
+    if (this.jam.isCohost()) return this.jam.command('next');
     this.state.playNext();
   }
 
   prev(): void {
     if (this.controlsDisabled()) return;
+    if (this.jam.isCohost()) return this.jam.command('prev');
     if (this.currentTime() > 3) {
       this.yt.seekTo(0);
       if (this.state.onSeeked) this.state.onSeeked(0);
@@ -118,7 +122,7 @@ export class PlayerControlsComponent implements OnInit, OnDestroy {
   }
 
   onProgressClick(event: MouseEvent): void {
-    if (this.controlsDisabled()) return;
+    if (this.controlsDisabled() || this.jam.isCohost()) return;
     const bar = event.currentTarget as HTMLElement;
     const rect = bar.getBoundingClientRect();
     const pct = (event.clientX - rect.left) / rect.width;
@@ -152,7 +156,7 @@ export class PlayerControlsComponent implements OnInit, OnDestroy {
   onSeek(event: Event): void {
     const time = +(event.target as HTMLInputElement).value;
     this.scrub.set(null);
-    if (this.controlsDisabled() || !this.duration()) return;
+    if (this.controlsDisabled() || this.jam.isCohost() || !this.duration()) return;
     this.yt.seekTo(time);
     if (this.state.onSeeked) this.state.onSeeked(time);
   }

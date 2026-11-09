@@ -348,3 +348,104 @@ test("si el anfitrión pone a mano una canción de más abajo, las que se saltó
   guest.emit("vote-song", { videoId: "bbbbbbbbbb3" });
   assert.deepEqual((await voted).playlist.map((s) => s.title), ["Uno", "Cuatro", "Tres", "Dos"]);
 });
+
+// ── Personas: expulsar, co-anfitriones y pasar el mando ──
+
+test("el anfitrión expulsa a un invitado: sale de la sala y ya no puede actuar en ella", async () => {
+  const { host, guest, code } = await room();
+  const guestId = guest.id;
+  const kicked = once(guest, "kicked");
+  const left = once(host, "participant-left");
+  host.emit("kick-participant", { id: guestId });
+  assert.equal((await kicked).code, code);
+  assert.ok(!(await left).participants.some((p) => p.id === guestId));
+
+  // Si intenta agregar una canción, no pasa nada
+  guest.emit("add-song", { song: { videoId: "ccccccccccc", title: "X", channel: "" } });
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(sessions.get(code).playlist.length, 0);
+});
+
+test("un invitado no puede expulsar ni nombrar co-anfitriones", async () => {
+  const { host, guest, code } = await room();
+  guest.emit("kick-participant", { id: host.id });
+  guest.emit("set-cohost", { id: guest.id, on: true });
+  await new Promise((r) => setTimeout(r, 100));
+  const r = sessions.get(code);
+  assert.equal(r.participants.length, 2);
+  assert.deepEqual(r.cohostKeys, []);
+});
+
+test("co-anfitrión: maneja la música del anfitrión, quita canciones y vuelve con su llave", async () => {
+  const { host, guest, code } = await room();
+  const granted = once(guest, "cohost-granted");
+  const updated = once(host, "participant-updated");
+  host.emit("set-cohost", { id: guest.id, on: true });
+  const { cohostKey } = await granted;
+  assert.ok(cohostKey);
+  assert.equal((await updated).participants.find((p) => p.id === guest.id).isCohost, true);
+
+  // Sus controles llegan al dispositivo del anfitrión, que es donde suena
+  const command = once(host, "host-command");
+  guest.emit("host-command", { action: "next" });
+  assert.deepEqual(await command, { action: "next", by: "Luis" });
+
+  // Puede quitar canciones de la cola
+  host.emit("add-song", { song: { videoId: "ddddddddddd", title: "D", channel: "" } });
+  await once(guest, "queue-updated");
+  const removed = once(host, "queue-updated");
+  guest.emit("remove-song", { index: 0 });
+  assert.equal((await removed).playlist.length, 0);
+
+  // Recarga la página: vuelve como co-anfitrión con su llave
+  guest.close();
+  const again = client();
+  again.emit("rejoin-session", { code, name: "Luis", cohostKey });
+  assert.equal((await once(again, "session-joined")).isCohost, true);
+
+  // El anfitrión le quita el rol: la llave deja de servir
+  const revoked = once(again, "cohost-revoked");
+  host.emit("set-cohost", { id: again.id, on: false });
+  await revoked;
+  assert.deepEqual(sessions.get(code).cohostKeys, []);
+});
+
+test("un invitado normal no puede mandar comandos al anfitrión", async () => {
+  const { host, guest } = await room();
+  let got = false;
+  host.on("host-command", () => (got = true));
+  guest.emit("host-command", { action: "toggle" });
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(got, false);
+});
+
+test("pasar el mando: la otra persona queda de anfitrión y la llave vieja deja de servir", async () => {
+  const host = client();
+  host.emit("create-session", { name: "Ana", roomName: "Mando" });
+  const { code, hostKey: oldKey } = await once(host, "session-created");
+  const guest = client();
+  guest.emit("join-session", { code, name: "Luis" });
+  await once(guest, "session-joined");
+
+  const granted = once(guest, "host-granted");
+  const revoked = once(host, "host-revoked");
+  host.emit("transfer-host", { id: guest.id });
+  const { hostKey, state } = await granted;
+  await revoked;
+  assert.notEqual(hostKey, oldKey);
+  assert.ok(Array.isArray(state.playlist));
+  const r = sessions.get(code);
+  assert.equal(r.hostId, guest.id);
+  assert.equal(r.participants.find((p) => p.id === host.id).isHost, false);
+
+  // El anfitrión anterior ya no manda: sus comandos de anfitrión se ignoran
+  host.emit("play-song", { index: 0 });
+  host.emit("transfer-host", { id: host.id });
+  await new Promise((r2) => setTimeout(r2, 100));
+  assert.equal(sessions.get(code).hostId, guest.id);
+
+  // Y su llave vieja ya no lo hace anfitrión
+  const other = client();
+  other.emit("rejoin-session", { code, name: "Ana", hostKey: oldKey });
+  assert.equal((await once(other, "session-joined")).isHost, false);
+});

@@ -41,6 +41,8 @@ export class JamJoinComponent implements OnInit {
     this.jam.joinDialogOpen.set(false);
     this.jam.pendingJamCode.set('');
     this.cleanUrl();
+    // No quiso entrar a la sala del enlace: vuelve a la que estaba (si estaba en una).
+    if (!this.jam.isInSession()) this.jam.attemptRejoin();
   }
 
   private cleanUrl(): void {

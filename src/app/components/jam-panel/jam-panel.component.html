@@ -41,6 +41,21 @@
           <span class="participant-name">{{ p.name }}</span>
           @if (p.isHost) {
             <span class="host-badge">Host</span>
+          } @else if (p.isCohost) {
+            <span class="host-badge cohost-badge">Co-host</span>
+          }
+          @if (canManage(p)) {
+            <div class="participant-actions">
+              @if (isHost()) {
+                <button type="button" class="p-action" (click)="toggleCohost(p)"
+                  [attr.aria-label]="(p.isCohost ? 'Quitar co-anfitrión a ' : 'Hacer co-anfitrión a ') + p.name"
+                  [title]="p.isCohost ? 'Quitar co-anfitrión' : 'Hacer co-anfitrión'">{{ p.isCohost ? 'Quitar co-host' : 'Co-host' }}</button>
+                <button type="button" class="p-action" (click)="transfer(p)"
+                  [attr.aria-label]="'Pasarle el mando a ' + p.name" title="Pasar el mando: la música sonará en su dispositivo">Pasar mando</button>
+              }
+              <button type="button" class="p-action danger" (click)="kick(p)"
+                [attr.aria-label]="'Sacar a ' + p.name + ' de la sala'" title="Sacar de la sala">Sacar</button>
+            </div>
           }
 
         </div>

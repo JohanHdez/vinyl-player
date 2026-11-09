@@ -9,6 +9,7 @@ export interface JamParticipant {
   id: string;
   name: string;
   isHost: boolean;
+  isCohost?: boolean;
   listenLocally?: boolean;
   disconnectedAt?: number;
   oldSocketId?: string;

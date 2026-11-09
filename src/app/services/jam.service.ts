@@ -27,6 +27,9 @@ function readRooms(): MyRoom[] {
  * - Solo suena en el dispositivo del anfitrión; los invitados son control remoto.
  * - Una persona puede crear todas las salas que quiera ("Mis salas") y volver
  *   a cualquiera como anfitrión con la llave guardada en este dispositivo.
+ * - Co-anfitrión: maneja la música desde su celular, pero suena en el dispositivo
+ *   del anfitrión (sus controles viajan como "host-command").
+ * - El anfitrión puede pasar el mando: la música pasa a sonar en el otro dispositivo.
  * - Cada dispositivo está en una sala a la vez.
  */
 @Injectable({ providedIn: 'root' })
@@ -43,6 +46,9 @@ export class JamService {
 
   isInSession = signal(false);
   isHost = signal(false);
+  isCohost = signal(false);
+  /** ¿Puedo manejar la música y la cola de la sala? (o la mía, fuera de una sala) */
+  canControl = computed(() => !this.isInSession() || this.isHost() || this.isCohost());
   /**
    * Invitado: además de ser control remoto, puede escuchar la sala en su
    * dispositivo (con audífonos), sincronizado con el anfitrión. Por defecto no.
@@ -84,7 +90,7 @@ export class JamService {
       if (!this.suppressEmit && this.inRoom()) this.socket!.emit('add-song', { song });
     };
     this.state.onSongRemoved = (index: number) => {
-      if (!this.suppressEmit && this.inRoom() && this.isHost()) this.socket!.emit('remove-song', { index });
+      if (!this.suppressEmit && this.inRoom() && (this.isHost() || this.isCohost())) this.socket!.emit('remove-song', { index });
     };
     this.state.onSongReplaced = (index: number, song: Song) => {
       if (!this.suppressEmit && this.inRoom() && this.isHost()) this.socket!.emit('replace-song', { index, song });
@@ -134,7 +140,7 @@ export class JamService {
     const room = this.myRooms().find(r => r.code === code);
     if (!room) return;
     this.connect();
-    this.socket!.emit('rejoin-session', { code, name: this.myName() || 'Anfitrión', hostKey: room.hostKey });
+    this.socket!.emit('rejoin-session', { code, name: this.myName() || 'Anfitrión', ...this.keysFor(code) });
   }
 
   forgetMyRoom(code: string): void {
@@ -194,9 +200,42 @@ export class JamService {
     const code = localStorage.getItem(KEY_CURRENT);
     const name = localStorage.getItem(KEY_NAME);
     if (!code || !name) return;
-    const hostKey = this.myRooms().find(r => r.code === code)?.hostKey;
+    const pending = this.pendingJamCode();
+    // Abrió el enlace de OTRA sala: no se vuelve a la anterior, se entra a la nueva
+    // desde el diálogo (antes la anterior cerraba el diálogo y lo dejaba atado a ella).
+    if (pending && pending !== code) return;
+    if (pending === code) {
+      // El enlace es de la sala en la que ya estaba: entra directo, sin preguntar.
+      this.pendingJamCode.set('');
+      this.joinDialogOpen.set(false);
+    }
     this.connect();
-    this.socket!.emit('rejoin-session', { code, name, hostKey });
+    this.socket!.emit('rejoin-session', { code, name, ...this.keysFor(code) });
+  }
+
+  /** Llaves guardadas en este dispositivo para volver a una sala con su rol. */
+  private keysFor(code: string): { hostKey?: string; cohostKey?: string } {
+    const room = this.myRooms().find(r => r.code === code);
+    return { hostKey: room?.hostKey || undefined, cohostKey: room?.cohostKey };
+  }
+
+  // ── Personas (anfitrión y co-anfitriones) ─────────────────
+
+  kick(id: string): void {
+    if (this.inRoom() && (this.isHost() || this.isCohost())) this.socket!.emit('kick-participant', { id });
+  }
+
+  setCohost(id: string, on: boolean): void {
+    if (this.inRoom() && this.isHost()) this.socket!.emit('set-cohost', { id, on });
+  }
+
+  transferHost(id: string): void {
+    if (this.inRoom() && this.isHost()) this.socket!.emit('transfer-host', { id });
+  }
+
+  /** Co-anfitrión: pide al dispositivo del anfitrión pausar, saltar o poner una canción. */
+  command(action: 'toggle' | 'next' | 'prev' | 'play', videoId?: string): void {
+    if (this.inRoom() && this.isCohost()) this.socket!.emit('host-command', { action, videoId });
   }
 
   // ── Chat ──────────────────────────────────────────────
@@ -264,6 +303,7 @@ export class JamService {
   private resetRoomState(): void {
     this.isInSession.set(false);
     this.isHost.set(false);
+    this.isCohost.set(false);
     this.state.guestMode = false;
     this.sessionId.set('');
     this.sessionCode.set('');
@@ -283,6 +323,7 @@ export class JamService {
     this.participants.set(data.participants ?? []);
     this.hostOnline.set(data.hostOnline ?? true);
     this.isHost.set(!!data.isHost);
+    this.isCohost.set(!data.isHost && !!data.isCohost);
     this.isInSession.set(true);
     this.joinDialogOpen.set(false);
     this.rejoinCode = data.code;
@@ -368,6 +409,25 @@ export class JamService {
     });
   }
 
+  /** Aplica el estado de la sala: al entrar, o al recibir el mando. */
+  private applySyncState(data: SyncState): void {
+    this.state.resetPlaylist(data.playlist, -1);
+    if (data.currentIndex < 0 || !data.playlist[data.currentIndex]) return;
+    this.state.setCurrentSongDisplay(data.currentIndex);
+    if (this.isHost()) {
+      // El anfitrión retoma la canción donde iba (en pausa si estaba en pausa).
+      this.yt.loadVideoThen(data.playlist[data.currentIndex].videoId, () => {
+        if (data.currentTime && data.currentTime > 0) this.yt.seekTo(data.currentTime);
+        if (!data.isPlaying) this.yt.pause();
+      });
+    } else {
+      this.setClock(data.currentTime ?? 0, !!data.isPlaying);
+      this.state.updateTime(data.currentTime ?? 0, data.duration ?? 0);
+      this.state.setPlaying(!!data.isPlaying);
+      if (this.hearsHere) this.followHere(data.currentIndex, data.currentTime ?? 0, !!data.isPlaying);
+    }
+  }
+
   /** Aplica un cambio que viene de la sala sin reenviarlo. */
   private remote(fn: () => void): void {
     this.suppressEmit = true;
@@ -387,8 +447,7 @@ export class JamService {
     socket.on('connect', () => {
       this.connected.set(true);
       if (this.rejoinCode && this.isInSession()) {
-        const hostKey = this.myRooms().find(r => r.code === this.rejoinCode)?.hostKey;
-        socket.emit('rejoin-session', { code: this.rejoinCode, name: this.myName(), hostKey });
+        socket.emit('rejoin-session', { code: this.rejoinCode, name: this.myName(), ...this.keysFor(this.rejoinCode) });
       }
     });
     socket.on('disconnect', () => {
@@ -505,25 +564,87 @@ export class JamService {
     });
 
     // Al entrar: la cola de la sala reemplaza la local.
-    socket.on('sync-state', (data: { playlist: Song[]; currentIndex: number; isPlaying?: boolean; currentTime?: number; duration?: number }) =>
-      this.remote(() => {
-        this.state.resetPlaylist(data.playlist, -1);
-        if (data.currentIndex < 0 || !data.playlist[data.currentIndex]) return;
-        this.state.setCurrentSongDisplay(data.currentIndex);
-        if (this.isHost()) {
-          // El anfitrión retoma la canción donde iba (en pausa si estaba en pausa).
-          this.yt.loadVideoThen(data.playlist[data.currentIndex].videoId, () => {
-            if (data.currentTime && data.currentTime > 0) this.yt.seekTo(data.currentTime);
-            if (!data.isPlaying) this.yt.pause();
-          });
+    socket.on('sync-state', (data: SyncState) => this.remote(() => this.applySyncState(data)));
+
+    // ── Roles: expulsado, co-anfitrión, pasar el mando ──
+    socket.on('kicked', (data: { code: string; by: string }) => {
+      if (this.hearsHere || this.isHost()) this.yt.pause();
+      const room = this.myRooms().find(r => r.code === data.code);
+      if (room && !room.hostKey) this.forgetMyRoom(data.code);
+      localStorage.removeItem(KEY_CURRENT);
+      this.rejoinCode = '';
+      this.stopSyncInterval();
+      this.resetRoomState();
+      this.state.toast$.next(`${data.by} te sacó de la sala`);
+    });
+
+    socket.on('cohost-granted', (data: { code: string; roomName: string; cohostKey: string }) => {
+      const prev = this.myRooms().find(r => r.code === data.code);
+      this.saveRooms(rememberRoom(this.myRooms(), {
+        code: data.code, name: data.roomName, hostKey: prev?.hostKey ?? '', cohostKey: data.cohostKey, createdAt: prev?.createdAt ?? Date.now(),
+      }));
+      this.isCohost.set(true);
+      this.state.toast$.next('🎛️ Ahora eres co-anfitrión: puedes manejar la música de la sala');
+    });
+
+    socket.on('cohost-revoked', (data: { code: string }) => {
+      this.isCohost.set(false);
+      const room = this.myRooms().find(r => r.code === data.code);
+      if (room && !room.hostKey) this.forgetMyRoom(data.code);
+      this.state.toast$.next('Ya no eres co-anfitrión de la sala');
+    });
+
+    socket.on('host-granted', (data: { code: string; roomName: string; hostKey: string; state: SyncState }) => {
+      this.saveRooms(rememberRoom(this.myRooms(), { code: data.code, name: data.roomName, hostKey: data.hostKey, createdAt: Date.now() }));
+      this.isHost.set(true);
+      this.isCohost.set(false);
+      this.state.guestMode = false;
+      this.hostOnline.set(true);
+      this.remote(() => this.applySyncState(data.state));
+      this.startSyncInterval();
+      this.state.toast$.next('🎚️ Ahora eres el anfitrión: la música suena en este dispositivo');
+    });
+
+    socket.on('host-revoked', (data: { code: string }) => {
+      this.stopSyncInterval();
+      this.isHost.set(false);
+      this.state.guestMode = true;
+      this.forgetMyRoom(data.code);
+      if (this.listenHere() && this.state.currentIndex >= 0) {
+        this.setClock(this.yt.getCurrentTime(), this.state.isPlaying$.value);
+      } else {
+        this.yt.pause();
+      }
+      this.state.toast$.next('Pasaste el mando: la música ahora suena en el otro dispositivo');
+    });
+
+    // Anfitrión: ejecuta lo que pide un co-anfitrión (la música suena aquí).
+    socket.on('host-command', (data: { action: string; videoId?: string }) => {
+      if (!this.isHost()) return;
+      if (data.action === 'toggle') {
+        const ct = this.yt.getCurrentTime();
+        if (this.state.isPlaying$.value) {
+          this.yt.pause();
+          this.emitPause(ct);
         } else {
-          this.setClock(data.currentTime ?? 0, !!data.isPlaying);
-          this.state.updateTime(data.currentTime ?? 0, data.duration ?? 0);
-          this.state.setPlaying(!!data.isPlaying);
-          if (this.hearsHere) this.followHere(data.currentIndex, data.currentTime ?? 0, !!data.isPlaying);
+          this.yt.play();
+          this.emitResume(ct);
         }
-      })
-    );
+      } else if (data.action === 'next') {
+        this.state.playNext();
+      } else if (data.action === 'prev') {
+        if (this.yt.getCurrentTime() > 3) {
+          this.yt.seekTo(0);
+          this.emitSeek(0);
+        } else {
+          this.state.playPrev();
+        }
+      } else if (data.action === 'play') {
+        const index = this.state.playlist$.value.findIndex(s => s.videoId === data.videoId);
+        if (index >= 0) this.state.play(index);
+      }
+    });
+    socket.on('command-error', (data: { message: string }) => this.state.toast$.next(data.message));
 
     socket.on('session-expired', (data?: { code?: string }) => {
       if (data?.code) this.forgetMyRoom(data.code);
@@ -537,12 +658,21 @@ export class JamService {
   }
 }
 
+interface SyncState {
+  playlist: Song[];
+  currentIndex: number;
+  isPlaying?: boolean;
+  currentTime?: number;
+  duration?: number;
+}
+
 interface RoomSnapshot {
   sessionId: string;
   code: string;
   roomName?: string;
   participants?: JamParticipant[];
   isHost?: boolean;
+  isCohost?: boolean;
   hostOnline?: boolean;
   messages?: ChatMessage[];
 }

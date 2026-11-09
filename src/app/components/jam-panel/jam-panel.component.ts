@@ -25,6 +25,7 @@ export class JamPanelComponent implements OnInit {
   currentSong = signal<Song | null>(null);
   qrReady = signal(false);
   isHost = signal(false);
+  isCohost = signal(false);
   get roomName() {
     return this.jam.roomName;
   }
@@ -40,6 +41,7 @@ export class JamPanelComponent implements OnInit {
       this.participants.set(this.jam.participants());
       this.currentSong.set(this.state.currentSong$.value);
       this.isHost.set(this.jam.isHost());
+      this.isCohost.set(this.jam.isCohost());
 
       if (this.jam.sessionCode() && !this.qrReady()) {
         this.generateQR();
@@ -47,6 +49,26 @@ export class JamPanelComponent implements OnInit {
       requestAnimationFrame(checkState);
     };
     requestAnimationFrame(checkState);
+  }
+
+  /** ¿Puedo actuar sobre esta persona? El anfitrión sobre todos; un co-anfitrión solo sobre invitados. */
+  canManage(p: JamParticipant): boolean {
+    if (p.id === this.jam.myId || p.isHost) return false;
+    return this.isHost() || (this.isCohost() && !p.isCohost);
+  }
+
+  toggleCohost(p: JamParticipant): void {
+    this.jam.setCohost(p.id, !p.isCohost);
+  }
+
+  transfer(p: JamParticipant): void {
+    if (confirm(`¿Pasarle el mando a ${p.name}? La música empezará a sonar en su dispositivo y tú quedarás como invitado.`)) {
+      this.jam.transferHost(p.id);
+    }
+  }
+
+  kick(p: JamParticipant): void {
+    if (confirm(`¿Sacar a ${p.name} de la sala?`)) this.jam.kick(p.id);
   }
 
   thumbUrl(): string {

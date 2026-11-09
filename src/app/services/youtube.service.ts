@@ -4,6 +4,7 @@ import { PlayerStateService } from './player-state.service';
 import { Song } from '../models/song.model';
 import { ArtistPage, CategoryPage, ExploreHome, PlaylistPage } from '../models/explore.model';
 import { PROXY_URL } from './proxy-url';
+import { isBrowserPause } from './background-play';
 
 // Tipos mínimos del YouTube IFrame API: solo lo que usamos.
 interface YTPlayer {
@@ -45,6 +46,16 @@ export class YouTubeService {
   /** Callback fired once after next video starts playing */
   private onVideoStarted: (() => void) | null = null;
 
+  /**
+   * Segundo plano: ¿la app quiere que suene? Solo pause() lo apaga, así una pausa
+   * que no pidió nadie (el navegador al apagar la pantalla) se puede deshacer.
+   */
+  private wantsToPlay = false;
+  /** Estado real del reproductor (la interfaz puede seguir mostrando "sonando"). */
+  private reallyPlaying = false;
+  private hiddenAt = 0;
+  private resumeTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor(
     private state: PlayerStateService,
     private ngZone: NgZone
@@ -52,6 +63,7 @@ export class YouTubeService {
 
   init(): void {
     this.loadIFrameAPI();
+    this.watchVisibility();
     this.state.playSong$.subscribe(song => this.loadVideo(song.videoId));
     this.state.volume$.subscribe(vol => this.player?.setVolume(vol));
   }
@@ -81,6 +93,7 @@ export class YouTubeService {
         disablekb: 1,
         fs: 0,
         modestbranding: 1,
+        playsinline: 1,
         rel: 0,
       },
       events: {
@@ -105,8 +118,12 @@ export class YouTubeService {
   private onStateChange(yt: YTNamespace, playerState: number): void {
     const { ENDED, PLAYING, PAUSED } = yt.PlayerState;
 
+    if (playerState !== PLAYING) this.reallyPlaying = false;
     if (playerState === ENDED) {
+      // Terminó: no hay nada que reanudar hasta que se cargue la siguiente.
+      this.wantsToPlay = false;
       if (this.state.repeat$.value) {
+        this.wantsToPlay = true;
         this.player?.seekTo(0);
         this.player?.playVideo();
         return;
@@ -119,6 +136,7 @@ export class YouTubeService {
       this.state.playNext();
     }
     if (playerState === PLAYING) {
+      this.reallyPlaying = true;
       this.state.setPlaying(true);
       this.startProgressUpdate();
       if (this.onVideoStarted) {
@@ -128,6 +146,11 @@ export class YouTubeService {
       }
     }
     if (playerState === PAUSED) {
+      // Chrome y otros pausan al apagar la pantalla: se reanuda sin marcarlo como pausa.
+      if (isBrowserPause({ wantsToPlay: this.wantsToPlay, hidden: document.hidden, msSinceHidden: Date.now() - this.hiddenAt })) {
+        this.scheduleResume(250);
+        return;
+      }
       this.state.setPlaying(false);
       this.stopProgressUpdate();
     }
@@ -141,6 +164,9 @@ export class YouTubeService {
 
   loadVideo(videoId: string): void {
     this.currentVideoId = videoId;
+    this.wantsToPlay = true;
+    // Con la pantalla apagada, algunos navegadores cargan la siguiente pero no la arrancan.
+    if (document.hidden) this.scheduleResume(1500);
     if (!this.player || !this.playerReady) {
       this.pendingVideoId = videoId;
       this.state.toast$.next('Cargando reproductor...');
@@ -156,11 +182,43 @@ export class YouTubeService {
   }
 
   play(): void {
+    this.wantsToPlay = true;
     if (this.playerReady) this.player?.playVideo();
   }
 
   pause(): void {
+    this.wantsToPlay = false;
+    this.cancelResume();
     if (this.playerReady) this.player?.pauseVideo();
+  }
+
+  // --- Segundo plano ---
+
+  private watchVisibility(): void {
+    if (typeof document === 'undefined') return;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.hiddenAt = Date.now();
+        return;
+      }
+      // Al volver a la app: si debía estar sonando y no suena, arranca.
+      if (this.wantsToPlay && !this.reallyPlaying) this.ngZone.run(() => this.resumeNow());
+    });
+  }
+
+  private scheduleResume(delayMs: number): void {
+    this.cancelResume();
+    this.resumeTimer = setTimeout(() => this.ngZone.run(() => this.resumeNow()), delayMs);
+  }
+
+  private cancelResume(): void {
+    if (this.resumeTimer) clearTimeout(this.resumeTimer);
+    this.resumeTimer = null;
+  }
+
+  private resumeNow(): void {
+    this.resumeTimer = null;
+    if (this.wantsToPlay && this.playerReady && !this.reallyPlaying) this.player?.playVideo();
   }
 
   seekTo(seconds: number): void {

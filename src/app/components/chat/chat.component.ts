@@ -160,7 +160,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   playNow(song: Song): void {
     this.state.addToPlaylist({ ...song, source: 'user' });
     const idx = this.state.playlist$.value.findIndex(s => s.videoId === song.videoId);
-    if (idx >= 0) this.state.play(idx);
+    if (idx < 0) return;
+    if (this.jam.isCohost()) this.jam.command('play', song.videoId);
+    else this.state.play(idx);
   }
 
   toggleReact(event: Event, id: string): void {

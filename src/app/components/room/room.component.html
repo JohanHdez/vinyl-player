@@ -84,7 +84,7 @@
   <div class="room">
     <header class="room-header">
       <div class="room-title">
-        <span class="room-kicker">Sala · {{ jam.sessionCode() }} · {{ jam.isHost() ? 'eres el anfitrión' : jam.listenHere() ? 'escuchas aquí y controlas desde tu celular' : 'tu celular es el control' }}</span>
+        <span class="room-kicker">Sala · {{ jam.sessionCode() }} · {{ jam.isHost() ? 'eres el anfitrión' : jam.isCohost() ? 'eres co-anfitrión: manejas la música desde aquí' : jam.listenHere() ? 'escuchas aquí y controlas desde tu celular' : 'tu celular es el control' }}</span>
         <h1 class="font-display">{{ jam.roomName() || 'Sala' }}</h1>
       </div>
       <div class="room-people" aria-label="Personas en la sala">

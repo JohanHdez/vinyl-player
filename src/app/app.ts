@@ -20,6 +20,7 @@ import { PlayerStateService } from './services/player-state.service';
 import { JamService } from './services/jam.service';
 import { RadioService } from './services/radio.service';
 import { PlaybackRecoveryService } from './services/playback-recovery.service';
+import { MediaSessionService } from './services/media-session.service';
 import { Song } from './models/song.model';
 
 export type AppView = 'home' | 'explore' | 'search' | 'nowplaying' | 'library' | 'room' | 'terms';
@@ -99,6 +100,7 @@ export class App implements OnInit, OnDestroy {
     private jamService: JamService,
     readonly radio: RadioService,
     private recovery: PlaybackRecoveryService,
+    private mediaSession: MediaSessionService,
     private appRef: ApplicationRef,
     private cdr: ChangeDetectorRef
   ) {
@@ -115,6 +117,7 @@ export class App implements OnInit, OnDestroy {
     this.yt.init();
     this.radio.start();
     this.recovery.start();
+    this.mediaSession.start();
     this.subs.push(
       this.state.isPlaying$.subscribe(p => {
         this.isPlaying.set(p);
@@ -223,10 +226,16 @@ export class App implements OnInit, OnDestroy {
   onKeydown(event: KeyboardEvent): void {
     const tag = (event.target as HTMLElement).tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-    if (event.code === 'Space') {
-      event.preventDefault();
-      this.togglePlay();
+    if (event.code === 'Space') event.preventDefault();
+    // En una sala, el teclado solo maneja la música si eres anfitrión o co-anfitrión.
+    if (this.jamService.isInSession() && !this.jamService.isHost()) {
+      if (!this.jamService.isCohost()) return;
+      if (event.code === 'Space') this.jamService.command('toggle');
+      if (event.code === 'ArrowRight') this.jamService.command('next');
+      if (event.code === 'ArrowLeft') this.jamService.command('prev');
+      return;
     }
+    if (event.code === 'Space') this.togglePlay();
     if (event.code === 'ArrowRight') this.state.playNext();
     if (event.code === 'ArrowLeft') this.state.playPrev();
   }

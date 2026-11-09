@@ -8,7 +8,11 @@
 // - Reproducir, saltar, pausar y quitar canciones es solo del anfitrión.
 // - El anfitrión se identifica con una llave secreta (hostKey) que recibe al crear
 //   la sala; con ella puede volver desde cualquier recarga o desde "Mis salas".
-// - Si el anfitrión se va, la sala espera: el control NUNCA pasa a un invitado.
+// - Si el anfitrión se va, la sala espera: el control solo pasa a otra persona si el
+//   anfitrión le "pasa el mando" (y entonces la música suena en el dispositivo de ella).
+// - Co-anfitriones: manejan la sala desde su celular (pausar, saltar, poner, quitar,
+//   expulsar), pero la música sigue sonando en el dispositivo del anfitrión. Vuelven
+//   con su propia llave (cohostKey), que el anfitrión puede quitarles.
 // - Una persona puede tener varias salas, pero cada conexión está en una a la vez.
 // - Las salas vacías duran ROOM_TTL_MS sin actividad; con DATA_DIR se guardan en disco.
 
@@ -38,12 +42,16 @@ function generateCode() {
   return code;
 }
 
-function newRoom({ code = generateCode(), name, hostKey = crypto.randomBytes(16).toString("hex"), playlist = [], currentIndex = -1, messages = [], createdAt = Date.now(), lastActiveAt = Date.now() }) {
+const newKey = () => crypto.randomBytes(16).toString("hex");
+const HOST_COMMANDS = new Set(["toggle", "next", "prev", "play"]);
+
+function newRoom({ code = generateCode(), name, hostKey = newKey(), cohostKeys = [], playlist = [], currentIndex = -1, messages = [], createdAt = Date.now(), lastActiveAt = Date.now() }) {
   return {
     sessionId: `jam_${code}`,
     code,
     name: chat.cleanText(name, 40) || "Sala sin nombre",
     hostKey,
+    cohostKeys: Array.isArray(cohostKeys) ? cohostKeys.filter((k) => typeof k === "string") : [],
     hostId: null,
     participants: [],
     playlist: Array.isArray(playlist) ? playlist.slice(0, MAX_QUEUE) : [],
@@ -61,7 +69,7 @@ function newRoom({ code = generateCode(), name, hostKey = crypto.randomBytes(16)
 const active = (room) => room.participants.filter((p) => !p.disconnectedAt);
 const participantOf = (room, socketId) => room.participants.find((p) => p.id === socketId);
 const publicParticipants = (room) =>
-  active(room).map(({ id, name, isHost }) => ({ id, name, isHost, listenLocally: isHost }));
+  active(room).map(({ id, name, isHost, isCohost }) => ({ id, name, isHost, isCohost: !!isCohost, listenLocally: isHost }));
 
 function estimatedTime(room) {
   return room.isPlaying && room.lastUpdated ? room.currentTime + (Date.now() - room.lastUpdated) / 1000 : room.currentTime;
@@ -75,6 +83,7 @@ function roomSnapshot(room, socketId) {
     roomName: room.name,
     participants: publicParticipants(room),
     isHost: room.hostId === socketId,
+    isCohost: !!participantOf(room, socketId)?.isCohost,
     hostOnline: !!room.hostId,
     messages: room.messages,
   };
@@ -157,6 +166,11 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
     let currentCode = null;
     const current = () => (currentCode ? sessions.get(currentCode) : null);
     const isHostOf = (room) => room && room.hostId === socket.id;
+    /** Anfitrión o co-anfitrión de la sala. */
+    const canControl = (room) => {
+      const me = room && participantOf(room, socket.id);
+      return !!me && (me.isHost || !!me.isCohost);
+    };
 
     /** Sale de la sala actual (si hay) antes de entrar a otra. */
     const leaveCurrent = ({ graceful }) => {
@@ -243,7 +257,7 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
     });
 
     // Volver a una sala: como anfitrión (con su llave) o como invitado (por nombre).
-    socket.on("rejoin-session", ({ code, name, hostKey } = {}) => {
+    socket.on("rejoin-session", ({ code, name, hostKey, cohostKey } = {}) => {
       const room = typeof code === "string" ? sessions.get(code.trim().toUpperCase()) : null;
       if (!room) return socket.emit("session-expired", { code });
       if (currentCode !== room.code) leaveCurrent({ graceful: false });
@@ -266,7 +280,13 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
         clearTimeout(waiting.disconnectTimer);
         room.participants = room.participants.filter((p) => p !== waiting);
       }
-      enter(room, { id: socket.id, name: chat.cleanName(name), isHost: false }, "session-joined");
+      const guest = { id: socket.id, name: chat.cleanName(name), isHost: false };
+      if (typeof cohostKey === "string" && room.cohostKeys.includes(cohostKey)) {
+        // Si otra conexión tenía la misma llave (otra pestaña), la nueva se queda con ella.
+        for (const p of room.participants) if (p.cohostKey === cohostKey) Object.assign(p, { isCohost: false, cohostKey: undefined });
+        Object.assign(guest, { isCohost: true, cohostKey });
+      }
+      enter(room, guest, "session-joined");
     });
 
     socket.on("leave-session", () => leaveCurrent({ graceful: false }));
@@ -300,7 +320,7 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
 
     socket.on("remove-song", ({ index } = {}) => {
       const room = current();
-      if (!isHostOf(room) || !Number.isInteger(index) || index < 0 || index >= room.playlist.length) return;
+      if (!canControl(room) || !Number.isInteger(index) || index < 0 || index >= room.playlist.length) return;
       room.playlist.splice(index, 1);
       if (index < room.currentIndex) room.currentIndex--;
       else if (index === room.currentIndex) room.currentIndex = -1;
@@ -349,6 +369,91 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
       Object.assign(r, { currentTime: p.currentTime, isPlaying: !!p.isPlaying });
       if (p.duration) r.duration = p.duration;
     }, "playback-synced");
+
+    // ── Personas: expulsar, co-anfitriones y pasar el mando ──
+
+    /** Quien está conectado ahora en la sala con ese id. */
+    const target = (room, id) => room.participants.find((p) => p.id === id && !p.disconnectedAt);
+
+    const dropCohostKey = (room, p) => {
+      if (p.cohostKey) room.cohostKeys = room.cohostKeys.filter((k) => k !== p.cohostKey);
+      Object.assign(p, { isCohost: false, cohostKey: undefined });
+    };
+
+    // Anfitrión o co-anfitrión sacan a alguien. Al anfitrión nadie lo saca, y un
+    // co-anfitrión no saca a otro co-anfitrión.
+    socket.on("kick-participant", ({ id } = {}) => {
+      const room = current();
+      const me = room && participantOf(room, socket.id);
+      const who = room && target(room, id);
+      if (!me || !who || who === me || !canControl(room) || who.isHost) return;
+      if (who.isCohost && !me.isHost) return;
+      dropCohostKey(room, who);
+      clearTimeout(who.disconnectTimer);
+      room.participants = room.participants.filter((p) => p !== who);
+      const theirs = io.sockets.sockets.get(who.id);
+      theirs?.emit("kicked", { code: room.code, by: me.name });
+      theirs?.leave(room.sessionId);
+      broadcastPeople(room, "participant-left");
+      systemMessage(room, `${me.name} sacó a ${who.name} de la sala`);
+    });
+
+    // El anfitrión nombra (o quita) co-anfitriones.
+    socket.on("set-cohost", ({ id, on } = {}) => {
+      const room = current();
+      const who = room && target(room, id);
+      if (!isHostOf(room) || !who || who.isHost) return;
+      const me = participantOf(room, socket.id);
+      const theirs = io.sockets.sockets.get(who.id);
+      if (on) {
+        if (who.isCohost) return;
+        const key = newKey();
+        room.cohostKeys.push(key);
+        Object.assign(who, { isCohost: true, cohostKey: key });
+        theirs?.emit("cohost-granted", { code: room.code, roomName: room.name, cohostKey: key });
+        systemMessage(room, `${me.name} hizo co-anfitrión a ${who.name} 🎛️`);
+      } else {
+        if (!who.isCohost) return;
+        dropCohostKey(room, who);
+        theirs?.emit("cohost-revoked", { code: room.code });
+        systemMessage(room, `${who.name} ya no es co-anfitrión`);
+      }
+      broadcastPeople(room, "participant-updated");
+      touch(room);
+    });
+
+    // Pasar el mando: la música pasa a sonar en el dispositivo de la otra persona y la
+    // llave cambia, así que el anfitrión anterior queda como invitado.
+    socket.on("transfer-host", ({ id } = {}) => {
+      const room = current();
+      const who = room && target(room, id);
+      const me = room && participantOf(room, socket.id);
+      if (!isHostOf(room) || !who || who === me) return;
+      dropCohostKey(room, who);
+      room.hostKey = newKey();
+      me.isHost = false;
+      who.isHost = true;
+      room.hostId = who.id;
+      io.sockets.sockets.get(who.id)?.emit("host-granted", { code: room.code, roomName: room.name, hostKey: room.hostKey, state: syncState(room) });
+      socket.emit("host-revoked", { code: room.code });
+      broadcastPeople(room, "participant-updated");
+      broadcastHost(room);
+      systemMessage(room, `${me.name} le pasó el mando a ${who.name} 🎚️`);
+    });
+
+    // El co-anfitrión maneja la música, que suena en el dispositivo del anfitrión.
+    socket.on("host-command", ({ action, videoId } = {}) => {
+      const room = current();
+      const me = room && participantOf(room, socket.id);
+      if (!me?.isCohost || !HOST_COMMANDS.has(action)) return;
+      // "play" va por id y no por posición: la cola se reordena con los votos.
+      if (action === "play" && !room.playlist.some((s) => s.videoId === videoId)) return;
+      if (!room.hostId) {
+        socket.emit("command-error", { message: "El anfitrión no está conectado: la música vuelve cuando regrese." });
+        return;
+      }
+      io.to(room.hostId).emit("host-command", { action, ...(action === "play" ? { videoId } : {}), by: me.name });
+    });
 
     // ── Chat ────────────────────────────────────────────────
 

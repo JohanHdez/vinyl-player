@@ -6,6 +6,8 @@ export interface MyRoom {
   name: string;
   /** Llave secreta para volver como anfitrión. Solo vive en este dispositivo. */
   hostKey: string;
+  /** Llave de co-anfitrión, si el anfitrión le dio ese rol en esta sala. */
+  cohostKey?: string;
   createdAt: number;
 }
 

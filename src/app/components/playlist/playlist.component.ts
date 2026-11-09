@@ -20,8 +20,8 @@ export class PlaylistComponent implements OnInit, OnDestroy {
 
   /** En una sala se vota; fuera de una sala la cola es solo tuya. */
   readonly inRoom = computed(() => this.jam.isInSession());
-  /** Reproducir y quitar es del anfitrión (o tuyo si no estás en una sala). */
-  readonly canControl = computed(() => !this.jam.isInSession() || this.jam.isHost());
+  /** Reproducir y quitar es del anfitrión y los co-anfitriones (o tuyo si no estás en una sala). */
+  readonly canControl = computed(() => this.jam.canControl());
 
   private subs: Subscription[] = [];
 
@@ -38,7 +38,9 @@ export class PlaylistComponent implements OnInit, OnDestroy {
   }
 
   playSong(index: number): void {
-    if (this.canControl()) this.state.play(index);
+    if (!this.canControl()) return;
+    if (this.jam.isCohost()) this.jam.command('play', this.playlist()[index]?.videoId);
+    else this.state.play(index);
   }
 
   remove(event: MouseEvent, index: number): void {
