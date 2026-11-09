@@ -9,13 +9,18 @@ import { JamService } from '../../services/jam.service';
 import { PlayerStateService } from '../../services/player-state.service';
 import { YouTubeService } from '../../services/youtube.service';
 import { ShareButtonComponent } from '../share-button/share-button.component';
+import { SongPickerComponent } from '../song-picker/song-picker.component';
+
+/** Una vez que la persona usó el botón de música, deja de brillar para llamar la atención. */
+const MUSIC_HINT_KEY = 'vinyl.musicHintSeen';
+const readHintSeen = () => { try { return localStorage.getItem(MUSIC_HINT_KEY) === '1'; } catch { return false; } };
 
 const AVATAR_COLORS = ['#c44b3f', '#c8984c', '#3d8bd9', '#3f9b6a', '#9b6bd1', '#d9823d', '#2fa59c', '#d4577a'];
 
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [ShareButtonComponent],
+  imports: [ShareButtonComponent, SongPickerComponent],
   templateUrl: './chat.component.html',
   styleUrl: './chat.component.scss',
 })
@@ -31,9 +36,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   /** En el celular: mensaje al que se le están mostrando las reacciones (al tocarlo). */
   readonly reactingTo = signal<string | null>(null);
   readonly pickerOpen = signal(false);
-  readonly pickerQuery = signal('');
-  readonly pickerResults = signal<Song[]>([]);
-  readonly pickerLoading = signal(false);
+  readonly musicHintSeen = signal(readHintSeen());
   readonly currentSong = signal<Song | null>(null);
   /** Cola y canción actual de la sala, para el estado de las tarjetas del chat. */
   private readonly queue = signal<Song[]>([]);
@@ -100,29 +103,10 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   togglePicker(): void {
     this.pickerOpen.update(v => !v);
-  }
-
-  shareCurrent(): void {
-    const song = this.currentSong();
-    if (!song) return;
-    this.share(song);
-  }
-
-  private pickerTimer?: ReturnType<typeof setTimeout>;
-
-  /** Busca solo mientras escribes, desde 3 letras. */
-  onPickerInput(value: string): void {
-    this.pickerQuery.set(value);
-    clearTimeout(this.pickerTimer);
-    if (value.trim().length >= 3) this.pickerTimer = setTimeout(() => void this.searchSongs(), 450);
-  }
-
-  async searchSongs(): Promise<void> {
-    const q = this.pickerQuery().trim();
-    if (!q) return;
-    this.pickerLoading.set(true);
-    this.pickerResults.set(await this.yt.search(q));
-    this.pickerLoading.set(false);
+    if (!this.musicHintSeen()) {
+      this.musicHintSeen.set(true);
+      try { localStorage.setItem(MUSIC_HINT_KEY, '1'); } catch { /* modo privado */ }
+    }
   }
 
   share(song: Song): void {
@@ -130,8 +114,6 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.jam.shareSong(song, this.draft().trim());
     this.draft.set('');
     this.pickerOpen.set(false);
-    this.pickerResults.set([]);
-    this.pickerQuery.set('');
   }
 
   // ── Acciones sobre mensajes ─────────────────────────────

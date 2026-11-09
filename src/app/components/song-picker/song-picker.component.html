@@ -1,0 +1,24 @@
+<div class="picker">
+  @if (current(); as song) {
+    <button type="button" class="picker-current" (click)="pick(song)">
+      <img [src]="thumb(song.videoId)" alt="" />
+      <span><small>{{ currentLabel() }}</small>{{ song.title }}</span>
+    </button>
+  }
+  <form class="picker-search" (submit)="$event.preventDefault(); search()">
+    <input #field type="search" [placeholder]="placeholder()" [value]="query()" (input)="onInput($any($event.target).value)" aria-label="Buscar canción" />
+    <button type="submit">Buscar</button>
+  </form>
+  @if (loading()) { <p class="picker-hint">Buscando…</p> }
+  <ul class="picker-results">
+    @for (song of results().slice(0, 6); track song.videoId) {
+      <li>
+        <button type="button" (click)="pick(song)">
+          <img [src]="thumb(song.videoId)" alt="" loading="lazy" />
+          <span><strong>{{ song.title }}</strong><small>{{ song.channel }}</small></span>
+          <span class="picker-add" aria-hidden="true">＋</span>
+        </button>
+      </li>
+    }
+  </ul>
+</div>

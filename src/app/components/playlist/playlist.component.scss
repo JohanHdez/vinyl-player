@@ -247,3 +247,26 @@
   .pl-channel { font-size: 0.78rem; }
   .pl-vote { margin-left: 4px; padding: 0 12px; }
 }
+
+// "+ Agregar" en el encabezado de la cola: dorado, para que se vea dónde se pide música.
+.add-btn {
+  flex: none;
+  min-height: 32px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--accent-brass);
+  background: rgba(200, 152, 76, 0.12);
+  color: var(--accent-bright);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(230, 184, 106, 0.2);
+  transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+
+  &:hover, &:focus-visible { background: var(--accent-brass); color: #1a120b; }
+  &:active { transform: scale(0.96); }
+  &.open { background: transparent; border-color: var(--glass-border); color: var(--text-secondary); box-shadow: none; }
+}
+
+.queue-picker { border-bottom: 1px solid var(--glass-border); }

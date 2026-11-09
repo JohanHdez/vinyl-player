@@ -88,39 +88,18 @@
   <p class="typing" aria-live="polite">{{ typingText() }}</p>
 
   @if (pickerOpen()) {
-    <div class="picker">
-      @if (currentSong(); as song) {
-        <button type="button" class="picker-current" (click)="shareCurrent()">
-          <img [src]="thumb(song.videoId)" alt="" />
-          <span><small>Compartir lo que suena</small>{{ song.title }}</span>
-        </button>
-      }
-      <form class="picker-search" (submit)="$event.preventDefault(); searchSongs()">
-        <input type="search" placeholder="Busca una canción (desde 3 letras)" [value]="pickerQuery()" (input)="onPickerInput($any($event.target).value)" aria-label="Buscar canción para compartir" />
-        <button type="submit">Buscar</button>
-      </form>
-      @if (pickerLoading()) { <p class="picker-hint">Buscando…</p> }
-      <ul class="picker-results">
-        @for (song of pickerResults().slice(0, 6); track song.videoId) {
-          <li>
-            <button type="button" (click)="share(song)">
-              <img [src]="thumb(song.videoId)" alt="" loading="lazy" />
-              <span><strong>{{ song.title }}</strong><small>{{ song.channel }}</small></span>
-            </button>
-          </li>
-        }
-      </ul>
-    </div>
+    <app-song-picker [current]="currentSong()" placeholder="¿Qué quieres escuchar? (desde 3 letras)" (picked)="share($event)"></app-song-picker>
   }
 
   <div class="composer">
-    <button type="button" class="composer-music" [class.active]="pickerOpen()" (click)="togglePicker()" title="Compartir una canción" aria-label="Compartir una canción">
+    <button type="button" class="composer-music" [class.active]="pickerOpen()" [class.hint]="!musicHintSeen()" [attr.aria-expanded]="pickerOpen()"
+            (click)="togglePicker()" title="Pedir una canción" aria-label="Pedir una canción">
       <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>
     </button>
     <textarea
       rows="1"
       maxlength="500"
-      placeholder="Escribe un mensaje…"
+      placeholder="Escribe… o pide música con ♪"
       aria-label="Mensaje"
       [value]="draft()"
       (input)="onInput($any($event.target).value)"

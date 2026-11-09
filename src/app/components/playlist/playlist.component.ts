@@ -3,10 +3,12 @@ import { Subscription } from 'rxjs';
 import { PlayerStateService } from '../../services/player-state.service';
 import { JamService } from '../../services/jam.service';
 import { Song } from '../../models/song.model';
+import { SongPickerComponent } from '../song-picker/song-picker.component';
 
 @Component({
   selector: 'app-playlist',
   standalone: true,
+  imports: [SongPickerComponent],
   templateUrl: './playlist.component.html',
   styleUrl: './playlist.component.scss',
 })
@@ -17,6 +19,8 @@ export class PlaylistComponent implements OnInit, OnDestroy {
   playlist = signal<Song[]>([]);
   currentIndex = signal(-1);
   isPlaying = signal(false);
+  /** Buscador abierto dentro de la cola (en una sala). */
+  readonly adding = signal(false);
 
   /** En una sala se vota; fuera de una sala la cola es solo tuya. */
   readonly inRoom = computed(() => this.jam.isInSession());
@@ -35,6 +39,12 @@ export class PlaylistComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.subs.forEach(s => s.unsubscribe());
+  }
+
+  /** Pide una canción desde la cola: entra a la cola de la sala para votarla. */
+  add(song: Song): void {
+    this.state.addToPlaylist({ ...song, source: 'user' });
+    this.adding.set(false);
   }
 
   playSong(index: number): void {
