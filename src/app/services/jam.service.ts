@@ -1,4 +1,4 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { PlayerStateService } from './player-state.service';
 import { YouTubeService } from './youtube.service';
@@ -7,6 +7,7 @@ import { Song } from '../models/song.model';
 import { ChatMessage, Reaction } from '../models/chat.model';
 import { MyRoom, RoomStatus, forgetRoom, rememberRoom } from './my-rooms';
 import { PROXY_URL } from './proxy-url';
+import { I18nService } from '../i18n/i18n.service';
 
 const KEY_CURRENT = 'vinyl_jam_code';
 const KEY_NAME = 'vinyl_jam_name';
@@ -35,6 +36,7 @@ function readRooms(): MyRoom[] {
 @Injectable({ providedIn: 'root' })
 export class JamService {
   private socket: Socket | null = null;
+  private readonly i18n = inject(I18nService);
   private suppressEmit = false;
   private syncInterval: ReturnType<typeof setInterval> | null = null;
   private typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -339,6 +341,11 @@ export class JamService {
     }
   }
 
+  /** Error del servidor: en el idioma de esta persona si trae código; si no, el texto tal cual. */
+  private toastServer(data: ServerError): void {
+    this.state.toast$.next(this.i18n.server(data.code, undefined, data.message));
+  }
+
   private receiveMessage(message: ChatMessage): void {
     this.messages.update(list => [...list.slice(-199), message]);
     if (message.authorId) this.clearTyping(message.authorId);
@@ -476,8 +483,8 @@ export class JamService {
       this.messages.update(list => list.map(m => (m.id === data.messageId ? { ...m, reactions: data.reactions } : m)));
     });
     socket.on('typing', (data: { id: string; name: string }) => this.markTyping(data.id, data.name));
-    socket.on('chat-error', (data: { message: string }) => this.state.toast$.next(data.message));
-    socket.on('vote-error', (data: { message: string }) => this.state.toast$.next(data.message));
+    socket.on('chat-error', (data: ServerError) => this.toastServer(data));
+    socket.on('vote-error', (data: ServerError) => this.toastServer(data));
 
     // ── Cola ──
     // El servidor manda la cola completa ya ordenada por votos tras cada cambio.
@@ -644,7 +651,7 @@ export class JamService {
         if (index >= 0) this.state.play(index);
       }
     });
-    socket.on('command-error', (data: { message: string }) => this.state.toast$.next(data.message));
+    socket.on('command-error', (data: ServerError) => this.toastServer(data));
 
     socket.on('session-expired', (data?: { code?: string }) => {
       if (data?.code) this.forgetMyRoom(data.code);
@@ -654,8 +661,13 @@ export class JamService {
       this.state.toast$.next('Esa sala ya no existe. Puedes crear una nueva.');
     });
 
-    socket.on('error', (data: { message: string }) => this.state.toast$.next(data.message));
+    socket.on('error', (data: ServerError) => this.toastServer(data));
   }
+}
+
+interface ServerError {
+  code?: string;
+  message: string;
 }
 
 interface SyncState {

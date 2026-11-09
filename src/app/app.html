@@ -47,6 +47,7 @@
       </nav>
 
       <!-- Sidebar collapse toggle -->
+      <app-lang-switch class="sidebar-lang"></app-lang-switch>
       <button type="button" class="sidebar-terms" (click)="setView('terms')">Términos y privacidad</button>
 
       <button class="sidebar-toggle" (click)="toggleSidebar()" [attr.aria-label]="sidebarCollapsed() ? 'Expandir menú' : 'Contraer menú'">
@@ -94,7 +95,10 @@
           (addToPlaylist)="onAddToPlaylist($event)"
           (playNow)="onPlayNow($event)">
         </app-trending-grid>
-        <button type="button" class="terms-link" (click)="setView('terms')">Términos y privacidad</button>
+        <div class="home-footer">
+          <app-lang-switch></app-lang-switch>
+          <button type="button" class="terms-link" (click)="setView('terms')">Términos y privacidad</button>
+        </div>
       </div>
     }
 
@@ -181,7 +185,10 @@
           <p class="view-subtitle">Tu colección personal de música</p>
         </div>
         <app-playlist></app-playlist>
-        <button type="button" class="terms-link" (click)="setView('terms')">Términos y privacidad</button>
+        <div class="home-footer">
+          <app-lang-switch></app-lang-switch>
+          <button type="button" class="terms-link" (click)="setView('terms')">Términos y privacidad</button>
+        </div>
       </div>
     }
   </main>

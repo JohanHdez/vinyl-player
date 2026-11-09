@@ -132,7 +132,8 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
     io.to(room.sessionId).emit("chat-message", message);
     touch(room);
   };
-  const systemMessage = (room, text) => postMessage(room, chat.createMessage({ type: "system", author: "", text }));
+  /** Aviso del sistema en el chat: clave + datos (el cliente lo traduce) y texto en español de respaldo. */
+  const systemMessage = (room, key, params, text) => postMessage(room, chat.createMessage({ type: "system", author: "", text, key, params }));
   const broadcastPeople = (room, event = "participant-joined") =>
     io.to(room.sessionId).emit(event, { participants: publicParticipants(room) });
   const broadcastHost = (room) => io.to(room.sessionId).emit("host-status", { online: !!room.hostId });
@@ -184,22 +185,22 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
 
       if (me.isHost) {
         room.participants = room.participants.filter((p) => p !== me);
-        const goOffline = (text) => {
+        const goOffline = (key, text) => {
           room.hostId = null;
           room.isPlaying = false;
           broadcastHost(room);
           broadcastPeople(room, "participant-left");
-          systemMessage(room, text);
+          systemMessage(room, key, { name: me.name }, text);
         };
         if (!graceful) {
-          goOffline(`${me.name} cerró la sala por ahora. La música vuelve cuando regrese.`);
+          goOffline("host.closed", `${me.name} cerró la sala por ahora. La música vuelve cuando regrese.`);
           return;
         }
         // Se cayó la conexión o recargó la página: se le dan unos segundos para volver
         // sin avisar a nadie. Solo si no vuelve, la sala queda esperando.
         const leftId = socket.id;
         const timer = setTimeout(() => {
-          if (room.hostId === leftId) goOffline("El anfitrión se desconectó. La música vuelve cuando regrese.");
+          if (room.hostId === leftId) goOffline("host.disconnected", "El anfitrión se desconectó. La música vuelve cuando regrese.");
         }, HOST_GRACE_MS);
         timer.unref?.();
         return;
@@ -213,7 +214,7 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
           if (!room.participants.includes(me) || !me.disconnectedAt) return;
           room.participants = room.participants.filter((p) => p !== me);
           broadcastPeople(room, "participant-left");
-          systemMessage(room, `${me.name} salió de la sala`);
+          systemMessage(room, "left", { name: me.name }, `${me.name} salió de la sala`);
         }, GUEST_GRACE_MS);
         me.disconnectTimer.unref?.();
         return;
@@ -221,7 +222,7 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
 
       room.participants = room.participants.filter((p) => p !== me);
       broadcastPeople(room, "participant-left");
-      systemMessage(room, `${me.name} salió de la sala`);
+      systemMessage(room, "left", { name: me.name }, `${me.name} salió de la sala`);
     };
 
     const enter = (room, participant, event) => {
@@ -243,17 +244,17 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
       currentCode = room.code;
       socket.join(room.sessionId);
       socket.emit("session-created", { ...roomSnapshot(room, socket.id), hostKey: room.hostKey });
-      systemMessage(room, `${me.name} abrió «${room.name}»`);
+      systemMessage(room, "room.opened", { name: me.name, room: room.name }, `${me.name} abrió «${room.name}»`);
       broadcastPeople(room);
     });
 
     socket.on("join-session", ({ code, name } = {}) => {
       const room = typeof code === "string" ? sessions.get(code.trim().toUpperCase()) : null;
-      if (!room) return socket.emit("error", { message: "No encontré esa sala. Revisa el código." });
+      if (!room) return socket.emit("error", { code: "room.notFound", message: "No encontré esa sala. Revisa el código." });
       leaveCurrent({ graceful: false });
       const me = { id: socket.id, name: chat.cleanName(name), isHost: false };
       enter(room, me, "session-joined");
-      systemMessage(room, `${me.name} se unió a la sala`);
+      systemMessage(room, "joined", { name: me.name }, `${me.name} se unió a la sala`);
     });
 
     // Volver a una sala: como anfitrión (con su llave) o como invitado (por nombre).
@@ -271,7 +272,7 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
         enter(room, { id: socket.id, name: chat.cleanName(name, "Anfitrión"), isHost: true }, "session-joined");
         broadcastHost(room);
         // Si volvió dentro del tiempo de gracia (una recarga), nadie se enteró: no hace falta avisar.
-        if (wasOffline) systemMessage(room, "El anfitrión volvió 🎶");
+        if (wasOffline) systemMessage(room, "host.back", {}, "El anfitrión volvió 🎶");
         return;
       }
 
@@ -301,7 +302,7 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
       const entry = enqueue(room, me, song, song?.source);
       if (!entry) return;
       broadcastQueue(room);
-      if (entry.source !== "radio") systemMessage(room, `${me.name} agregó «${entry.title}» a la cola`);
+      if (entry.source !== "radio") systemMessage(room, "song.added", { name: me.name, title: entry.title }, `${me.name} agregó «${entry.title}» a la cola`);
     });
 
     // Votar sube una canción en la cola: la más votada de las que esperan suena primero.
@@ -312,10 +313,10 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
       if (toggleVote(room.playlist, room.currentIndex, videoId, me.id)) return broadcastQueue(room);
       // Antes fallaba en silencio: ahora se explica por qué no se pudo votar.
       const index = room.playlist.findIndex((s) => s.videoId === videoId);
-      const reason = index < 0 ? "Esa canción ya no está en la cola. Puedes volver a pedirla."
-        : index === room.currentIndex ? "Esa canción ya está sonando 🎶"
-        : "Esa canción ya sonó. Puedes volver a pedirla.";
-      socket.emit("vote-error", { videoId, message: reason });
+      const [code, reason] = index < 0 ? ["vote.missing", "Esa canción ya no está en la cola. Puedes volver a pedirla."]
+        : index === room.currentIndex ? ["vote.playing", "Esa canción ya está sonando 🎶"]
+        : ["vote.played", "Esa canción ya sonó. Puedes volver a pedirla."];
+      socket.emit("vote-error", { videoId, code, message: reason });
     });
 
     socket.on("remove-song", ({ index } = {}) => {
@@ -395,7 +396,7 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
       theirs?.emit("kicked", { code: room.code, by: me.name });
       theirs?.leave(room.sessionId);
       broadcastPeople(room, "participant-left");
-      systemMessage(room, `${me.name} sacó a ${who.name} de la sala`);
+      systemMessage(room, "kicked", { by: me.name, name: who.name }, `${me.name} sacó a ${who.name} de la sala`);
     });
 
     // El anfitrión nombra (o quita) co-anfitriones.
@@ -411,12 +412,12 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
         room.cohostKeys.push(key);
         Object.assign(who, { isCohost: true, cohostKey: key });
         theirs?.emit("cohost-granted", { code: room.code, roomName: room.name, cohostKey: key });
-        systemMessage(room, `${me.name} hizo co-anfitrión a ${who.name} 🎛️`);
+        systemMessage(room, "cohost.on", { by: me.name, name: who.name }, `${me.name} hizo co-anfitrión a ${who.name} 🎛️`);
       } else {
         if (!who.isCohost) return;
         dropCohostKey(room, who);
         theirs?.emit("cohost-revoked", { code: room.code });
-        systemMessage(room, `${who.name} ya no es co-anfitrión`);
+        systemMessage(room, "cohost.off", { name: who.name }, `${who.name} ya no es co-anfitrión`);
       }
       broadcastPeople(room, "participant-updated");
       touch(room);
@@ -438,7 +439,7 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
       socket.emit("host-revoked", { code: room.code });
       broadcastPeople(room, "participant-updated");
       broadcastHost(room);
-      systemMessage(room, `${me.name} le pasó el mando a ${who.name} 🎚️`);
+      systemMessage(room, "transfer", { from: me.name, to: who.name }, `${me.name} le pasó el mando a ${who.name} 🎚️`);
     });
 
     // El co-anfitrión maneja la música, que suena en el dispositivo del anfitrión.
@@ -449,7 +450,7 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
       // "play" va por id y no por posición: la cola se reordena con los votos.
       if (action === "play" && !room.playlist.some((s) => s.videoId === videoId)) return;
       if (!room.hostId) {
-        socket.emit("command-error", { message: "El anfitrión no está conectado: la música vuelve cuando regrese." });
+        socket.emit("command-error", { code: "host.offline", message: "El anfitrión no está conectado: la música vuelve cuando regrese." });
         return;
       }
       io.to(room.hostId).emit("host-command", { action, ...(action === "play" ? { videoId } : {}), by: me.name });
@@ -465,7 +466,7 @@ function registerJamHandlers(io, { store = createRoomStore() } = {}) {
 
     const allowed = () => {
       if (chatLimiter.allow(socket.id)) return true;
-      socket.emit("chat-error", { message: "Vas muy rápido. Espera unos segundos." });
+      socket.emit("chat-error", { code: "chat.tooFast", message: "Vas muy rápido. Espera unos segundos." });
       return false;
     };
 

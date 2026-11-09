@@ -449,3 +449,17 @@ test("pasar el mando: la otra persona queda de anfitrión y la llave vieja deja 
   other.emit("rejoin-session", { code, name: "Ana", hostKey: oldKey });
   assert.equal((await once(other, "session-joined")).isHost, false);
 });
+
+test("los avisos del sistema llevan clave y datos para traducirlos (y texto en español de respaldo)", async () => {
+  const { host, code } = await room();
+  const msg = nextMessage(host, (m) => m.type === "system" && m.key === "joined" && m.params.name === "Mia");
+  const late = client();
+  late.emit("join-session", { code, name: "Mia" });
+  const m = await msg;
+  assert.deepEqual(m.params, { name: "Mia" });
+  assert.equal(m.text, "Mia se unió a la sala");
+
+  const err = once(late, "error");
+  late.emit("join-session", { code: "ZZZZZZ", name: "Mia" });
+  assert.equal((await err).code, "room.notFound");
+});

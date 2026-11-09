@@ -14,8 +14,12 @@ const REACTIONS = ["🔥", "❤️", "😂", "👏", "🎵"];
 /**
  * @typedef {{
  *   id: string, type: "text"|"song"|"system", authorId: string|null, author: string,
- *   text: string, song?: Song, ts: number, reactions: Record<string, string[]>
+ *   text: string, song?: Song, ts: number, reactions: Record<string, string[]>,
+ *   key?: string, params?: Record<string, string>
  * }} ChatMessage
+ *
+ * Los mensajes del sistema llevan `key` y `params` para que cada persona los lea en su
+ * idioma (el cliente los traduce); `text` queda en español como respaldo.
  */
 
 let counter = 0;
@@ -46,8 +50,8 @@ function cleanSong(song) {
 }
 
 /** @returns {ChatMessage} */
-function createMessage({ type, author, authorId = null, text = "", song, now = Date.now() }) {
-  return { id: nextId(), type, authorId, author, text, ...(song ? { song } : {}), ts: now, reactions: {} };
+function createMessage({ type, author, authorId = null, text = "", song, key, params, now = Date.now() }) {
+  return { id: nextId(), type, authorId, author, text, ...(song ? { song } : {}), ...(key ? { key, params: params ?? {} } : {}), ts: now, reactions: {} };
 }
 
 /** Agrega al historial conservando solo los últimos HISTORY_SIZE. */

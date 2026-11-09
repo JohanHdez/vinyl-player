@@ -21,6 +21,7 @@ import { JamService } from './services/jam.service';
 import { RadioService } from './services/radio.service';
 import { PlaybackRecoveryService } from './services/playback-recovery.service';
 import { MediaSessionService } from './services/media-session.service';
+import { LangSwitchComponent } from './components/lang-switch/lang-switch.component';
 import { Song } from './models/song.model';
 
 export type AppView = 'home' | 'explore' | 'search' | 'nowplaying' | 'library' | 'room' | 'terms';
@@ -52,6 +53,7 @@ const TABS: { view: AppView; label: string; icon: string }[] = [
     RoomComponent,
     ShareButtonComponent,
     TermsComponent,
+    LangSwitchComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',

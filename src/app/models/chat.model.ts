@@ -10,7 +10,11 @@ export interface ChatMessage {
   /** Socket id de quien escribió; null en mensajes del sistema. */
   authorId: string | null;
   author: string;
+  /** Texto en español. En mensajes del sistema es el respaldo: se muestra `key` traducida. */
   text: string;
+  /** Mensajes del sistema: clave (sin el prefijo "srv.") y datos para traducirlos. */
+  key?: string;
+  params?: Record<string, string>;
   song?: Song;
   ts: number;
   /** emoji → ids de quienes reaccionaron */
