@@ -1,10 +1,12 @@
 import { Component, Input, computed, inject } from '@angular/core';
 import { Song } from '../../models/song.model';
 import { RadioService } from '../../services/radio.service';
+import { TPipe } from '../../i18n/i18n.service';
 
 @Component({
   selector: 'app-suggestions',
   standalone: true,
+  imports: [TPipe],
   templateUrl: './suggestions.component.html',
   styleUrl: './suggestions.component.scss',
 })

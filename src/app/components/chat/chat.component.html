@@ -1,15 +1,15 @@
-<section class="chat" aria-label="Chat de la sala">
+<section class="chat" [attr.aria-label]="'rooms.chat.aria' | t">
   <div class="chat-scroll" #scroller (scroll)="onScroll()" aria-live="polite">
     @if (view().length === 0) {
       <div class="chat-empty">
-        <p class="font-display">La sala está en silencio</p>
-        <span>Saluda o comparte la canción que estás escuchando.</span>
+        <p class="font-display">{{ 'rooms.chat.emptyTitle' | t }}</p>
+        <span>{{ 'rooms.chat.emptyHint' | t }}</span>
       </div>
     }
 
     @for (m of view(); track m.id) {
       @if (m.type === 'system') {
-        <p class="msg-system">{{ m.text }} · {{ time(m.ts) }}</p>
+        <p class="msg-system">{{ i18n.server(m.key, m.params, m.text) }} · {{ time(m.ts) }}</p>
       } @else {
         <div class="msg" [class.mine]="m.mine" [class.grouped]="!m.firstOfGroup" [class.reacting]="reactingTo() === m.id">
           @if (!m.mine) {
@@ -26,7 +26,7 @@
                 <div class="song-card">
                   <img [src]="thumb(song.videoId)" alt="" loading="lazy" />
                   <div class="song-info">
-                    <span class="song-label">🎵 La pidió para la cola</span>
+                    <span class="song-label">{{ 'rooms.chat.requested' | t }}</span>
                     <strong>{{ song.title }}</strong>
                     <span class="song-channel">{{ song.channel }}</span>
                   </div>
@@ -35,27 +35,27 @@
                   @let st = cardOf(song);
                   @switch (st.kind) {
                     @case ('playing') {
-                      <button type="button" disabled>♪ Sonando</button>
+                      <button type="button" disabled>{{ 'rooms.chat.playing' | t }}</button>
                     }
                     @case ('upcoming') {
                       @if (st.kind === 'upcoming') {
                         @if (jam.isHost() || jam.isCohost()) {
-                          <button type="button" (click)="playNow(st.song)">▶ Poner ahora</button>
+                          <button type="button" (click)="playNow(st.song)">{{ 'rooms.chat.playNow' | t }}</button>
                         }
                         <button type="button" class="vote" [class.voted]="votedByMe(st.song)" (click)="vote(st.song)"
-                                [attr.aria-pressed]="votedByMe(st.song)" [title]="votedByMe(st.song) ? 'Quitar mi voto' : 'Votar para que suene antes'">
+                                [attr.aria-pressed]="votedByMe(st.song)" [title]="(votedByMe(st.song) ? 'rooms.vote.remove' : 'rooms.vote.add') | t">
                           👍 {{ st.song.votes?.length ?? 0 }}
                         </button>
                       }
                     }
                     @case ('played') {
-                      <button type="button" disabled>✓ Ya sonó</button>
+                      <button type="button" disabled>{{ 'rooms.chat.played' | t }}</button>
                     }
                     @default {
-                      <button type="button" (click)="addToQueue(song)">+ Pedir</button>
+                      <button type="button" (click)="addToQueue(song)">{{ 'rooms.chat.request' | t }}</button>
                     }
                   }
-                  <app-share-button variant="inline" [song]="song" label="Enviar"></app-share-button>
+                  <app-share-button variant="inline" [song]="song" [label]="'rooms.chat.send' | t"></app-share-button>
                 </div>
               }
               @if (m.text) {
@@ -67,7 +67,7 @@
             @if (m.reactionList.length) {
               <div class="reactions">
                 @for (r of m.reactionList; track r.emoji) {
-                  <button type="button" class="reaction" [class.mine]="r.mine" (click)="react(m, r.emoji)" [attr.aria-label]="'Reacción ' + r.emoji">
+                  <button type="button" class="reaction" [class.mine]="r.mine" (click)="react(m, r.emoji)" [attr.aria-label]="'rooms.chat.reaction' | t: { emoji: r.emoji }">
                     {{ r.emoji }} <span>{{ r.count }}</span>
                   </button>
                 }
@@ -75,9 +75,9 @@
             }
           </div>
 
-          <div class="react-picker" role="group" aria-label="Reaccionar">
+          <div class="react-picker" role="group" [attr.aria-label]="'rooms.chat.react' | t">
             @for (e of reactions; track e) {
-              <button type="button" (click)="react(m, e)" [attr.aria-label]="'Reaccionar con ' + e">{{ e }}</button>
+              <button type="button" (click)="react(m, e)" [attr.aria-label]="'rooms.chat.reactWith' | t: { emoji: e }">{{ e }}</button>
             }
           </div>
         </div>
@@ -88,23 +88,23 @@
   <p class="typing" aria-live="polite">{{ typingText() }}</p>
 
   @if (pickerOpen()) {
-    <app-song-picker [current]="currentSong()" placeholder="¿Qué quieres escuchar? (desde 3 letras)" (picked)="share($event)"></app-song-picker>
+    <app-song-picker [current]="currentSong()" placeholder="rooms.chat.pickerPh" (picked)="share($event)"></app-song-picker>
   }
 
   <div class="composer">
     <button type="button" class="composer-music" [class.active]="pickerOpen()" [class.hint]="!musicHintSeen()" [attr.aria-expanded]="pickerOpen()"
-            (click)="togglePicker()" title="Pedir una canción" aria-label="Pedir una canción">
+            (click)="togglePicker()" [title]="'rooms.chat.requestSong' | t" [attr.aria-label]="'rooms.chat.requestSong' | t">
       <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>
     </button>
     <textarea
       rows="1"
       maxlength="500"
-      placeholder="Escribe… o pide música con ♪"
-      aria-label="Mensaje"
+      [placeholder]="'rooms.chat.inputPh' | t"
+      [attr.aria-label]="'rooms.chat.message' | t"
       [value]="draft()"
       (input)="onInput($any($event.target).value)"
       (keydown)="onKeydown($event)"></textarea>
-    <button type="button" class="composer-send" (click)="send()" [disabled]="!draft().trim()" aria-label="Enviar">
+    <button type="button" class="composer-send" (click)="send()" [disabled]="!draft().trim()" [attr.aria-label]="'rooms.chat.send' | t">
       <svg viewBox="0 0 24 24"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" /></svg>
     </button>
   </div>

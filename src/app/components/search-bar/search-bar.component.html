@@ -5,9 +5,8 @@
       #input
       type="search"
       class="search-input"
-      placeholder="Canción, artista o enlace"
-      aria-label="Buscar una canción, un artista o pegar un enlace de YouTube"
-      aria-label="Buscar música"
+      [placeholder]="'player.search.placeholder' | t"
+      [attr.aria-label]="'player.search.label' | t"
       [value]="query()"
       (input)="onInput($any($event.target).value)"
       (keydown)="onKeydown($event)"
@@ -16,17 +15,17 @@
       autocomplete="off"
     />
     @if (query()) {
-      <button type="button" class="search-clear" (click)="clear()" aria-label="Borrar búsqueda">
+      <button type="button" class="search-clear" (click)="clear()" [attr.aria-label]="'player.search.clear' | t">
         <svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
       </button>
     }
   </div>
 
   @if (query() && query().trim().length < minLength) {
-    <p class="search-hint">Sigue escribiendo… busco desde {{ minLength }} letras</p>
+    <p class="search-hint">{{ 'player.search.keepTyping' | t: { min: minLength } }}</p>
   } @else if (!query() && recent().length) {
-    <div class="search-recent" aria-label="Búsquedas recientes">
-      <span>Recientes:</span>
+    <div class="search-recent" [attr.aria-label]="'player.search.recentLabel' | t">
+      <span>{{ 'player.search.recent' | t }}</span>
       @for (term of recent(); track term) {
         <button type="button" class="recent-chip" (mousedown)="pick(term)">{{ term }}</button>
       }

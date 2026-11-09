@@ -1,7 +1,7 @@
 <div class="trending-section">
   <div class="trending-header">
     <svg viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
-    <h2 class="header-text">{{ heading }}</h2>
+    <h2 class="header-text">{{ heading || ('player.trending.title' | t) }}</h2>
   </div>
 
   @if (loading) {
@@ -19,7 +19,7 @@
   } @else if (songs.length === 0) {
     <div class="trending-empty">
       <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-      <p>No se pudieron cargar las tendencias</p>
+      <p>{{ 'player.trending.failed' | t }}</p>
     </div>
   } @else {
     <div class="trending-grid">
@@ -27,7 +27,7 @@
         <!-- La tarjeta entera responde al clic; el teclado y los lectores de pantalla usan el botón de
              la miniatura. El "+" es un botón hermano, no anidado (un botón dentro de otro no es válido). -->
         <div class="trending-card" (click)="onPlay(song)" [style.animation-delay]="(i * 50) + 'ms'">
-          <button type="button" class="card-thumb-wrap card-play" [attr.aria-label]="'Reproducir ' + song.title">
+          <button type="button" class="card-thumb-wrap card-play" [attr.aria-label]="'player.song.play' | t: { title: song.title }">
             <img [src]="thumbUrl(song.videoId)" alt="" class="card-thumb" loading="lazy">
             <div class="card-overlay">
               <div class="play-circle">
@@ -40,7 +40,7 @@
             <div class="card-title">{{ song.title }}</div>
             <div class="card-meta">
               <span class="card-channel">{{ song.channel }}</span>
-              <button class="card-add-btn" (click)="onAdd($event, song)" title="Agregar a la cola" [attr.aria-label]="'Agregar ' + song.title + ' a la cola'">
+              <button class="card-add-btn" (click)="onAdd($event, song)" [title]="'player.song.addToQueue' | t" [attr.aria-label]="'player.song.add' | t: { title: song.title }">
                 <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
               </button>
             </div>

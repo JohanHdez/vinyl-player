@@ -1,4 +1,5 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { TPipe } from '../../i18n/i18n.service';
 
 /**
  * Pregunta al entrar a una sala: ¿dónde quieres escuchar?
@@ -8,16 +9,17 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 @Component({
   selector: 'app-listen-choice',
   standalone: true,
+  imports: [TPipe],
   template: `
     <fieldset class="listen-choice">
-      <legend>¿Dónde quieres escuchar?</legend>
+      <legend>{{ 'rooms.where.legend' | t }}</legend>
 
       <label class="option" [class.selected]="!here">
         <input type="radio" [name]="name" [checked]="!here" (change)="pick(false)" />
         <span class="icon" aria-hidden="true">🔊</span>
         <span class="text">
-          <strong>En la sala</strong>
-          <small>Por los parlantes del anfitrión. Tu celular sirve para pedir, votar y chatear.</small>
+          <strong>{{ 'rooms.where.roomTitle' | t }}</strong>
+          <small>{{ 'rooms.where.roomText' | t }}</small>
         </span>
       </label>
 
@@ -25,8 +27,8 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
         <input type="radio" [name]="name" [checked]="here" (change)="pick(true)" />
         <span class="icon" aria-hidden="true">🎧</span>
         <span class="text">
-          <strong>En mi celular, con audífonos</strong>
-          <small>Suena también aquí, al mismo tiempo que en la sala. Puedes cambiarlo después.</small>
+          <strong>{{ 'rooms.where.hereTitle' | t }}</strong>
+          <small>{{ 'rooms.where.hereText' | t }}</small>
         </span>
       </label>
     </fieldset>

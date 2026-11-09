@@ -1,6 +1,8 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild, inject, input, output, signal } from '@angular/core';
 import { Song } from '../../models/song.model';
 import { YouTubeService } from '../../services/youtube.service';
+import { TKey } from '../../i18n/dict';
+import { TPipe } from '../../i18n/i18n.service';
 
 /**
  * Buscador de canciones para pedir música: se usa en el chat de la sala (comparte
@@ -9,6 +11,7 @@ import { YouTubeService } from '../../services/youtube.service';
 @Component({
   selector: 'app-song-picker',
   standalone: true,
+  imports: [TPipe],
   templateUrl: './song-picker.component.html',
   styleUrl: './song-picker.component.scss',
 })
@@ -17,8 +20,9 @@ export class SongPickerComponent implements AfterViewInit, OnDestroy {
 
   /** Lo que suena ahora, para ofrecer "compartir lo que suena" (opcional). */
   readonly current = input<Song | null>(null);
-  readonly currentLabel = input('Compartir lo que suena');
-  readonly placeholder = input('Busca una canción (desde 3 letras)');
+  /** Claves de traducción (se traducen en la plantilla, así cambian con el idioma). */
+  readonly currentLabel = input<TKey>('rooms.picker.current');
+  readonly placeholder = input<TKey>('rooms.picker.ph');
   readonly picked = output<Song>();
 
   @ViewChild('field') private field?: ElementRef<HTMLInputElement>;

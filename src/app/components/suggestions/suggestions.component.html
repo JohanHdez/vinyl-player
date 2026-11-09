@@ -2,7 +2,7 @@
   <section class="suggestions" aria-labelledby="suggestions-title">
     <header class="sg-header">
       <div class="sg-heading">
-        <span class="sg-eyebrow">Porque escuchas</span>
+        <span class="sg-eyebrow">{{ 'player.sg.because' | t }}</span>
         <h3 id="suggestions-title" class="sg-seed font-display">{{ seed.title }}</h3>
       </div>
 
@@ -12,17 +12,17 @@
         role="switch"
         [attr.aria-checked]="radio.autoplay()"
         (click)="toggleAutoplay()"
-        title="Seguir con canciones parecidas cuando se acabe la cola">
+        [title]="'player.sg.autoplayHint' | t">
         <span class="sg-switch-track"><span class="sg-switch-thumb"></span></span>
-        <span class="sg-switch-label">Radio automática</span>
+        <span class="sg-switch-label">{{ 'player.sg.autoplay' | t }}</span>
       </button>
     </header>
 
     <p class="sg-hint">
       @if (radio.autoplay()) {
-        La música no se detiene: cuando la cola se acabe, seguirá con canciones como estas.
+        {{ 'player.sg.on' | t }}
       } @else {
-        La música se detendrá al final de la cola.
+        {{ 'player.sg.off' | t }}
       }
     </p>
 
@@ -33,11 +33,11 @@
         }
       </ul>
     } @else if (visible().length === 0) {
-      <p class="sg-empty">No encontré canciones parecidas. Prueba con otra canción.</p>
+      <p class="sg-empty">{{ 'player.sg.empty' | t }}</p>
     } @else {
       <ul class="sg-list">
         @for (song of visible(); track song.videoId) {
-          <li class="sg-item" (click)="play(song)" title="Reproducir ahora">
+          <li class="sg-item" (click)="play(song)" [title]="'player.song.playNow' | t">
             <span class="sg-thumb">
               <img [src]="thumbUrl(song.videoId)" alt="" loading="lazy" />
               <span class="sg-play" aria-hidden="true">
@@ -48,7 +48,7 @@
               <span class="sg-title">{{ song.title }}</span>
               <span class="sg-channel">{{ song.channel }}@if (song.duration) { · {{ song.duration }}}</span>
             </span>
-            <button type="button" class="sg-add" (click)="add($event, song)" [attr.aria-label]="'Agregar ' + song.title + ' a la cola'" title="Agregar a la cola">
+            <button type="button" class="sg-add" (click)="add($event, song)" [attr.aria-label]="'player.song.add' | t: { title: song.title }" [title]="'player.song.addToQueue' | t">
               <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" /></svg>
             </button>
           </li>
@@ -56,8 +56,8 @@
       </ul>
 
       <div class="sg-actions">
-        <button type="button" class="sg-btn sg-btn--primary" (click)="addAll()">Agregar estas {{ visible().length }} a la cola</button>
-        <button type="button" class="sg-btn" (click)="radio.shuffleSuggestions()">Otras sugerencias</button>
+        <button type="button" class="sg-btn sg-btn--primary" (click)="addAll()">{{ 'player.sg.addAll' | t: { count: visible().length } }}</button>
+        <button type="button" class="sg-btn" (click)="radio.shuffleSuggestions()">{{ 'player.sg.others' | t }}</button>
       </div>
     }
   </section>

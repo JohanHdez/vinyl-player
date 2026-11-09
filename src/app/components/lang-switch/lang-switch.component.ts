@@ -11,7 +11,7 @@ import { Lang } from '../../i18n/dict';
     <div class="lang-switch" role="group" [attr.aria-label]="'lang.label' | t">
       @for (l of langs; track l) {
         <button type="button" [class.active]="i18n.lang() === l" [attr.aria-pressed]="i18n.lang() === l"
-                [attr.lang]="l" [title]="('lang.' + l) | t" (click)="i18n.setLang(l)">{{ l.toUpperCase() }}</button>
+                [attr.lang]="l" [title]="(l === 'es' ? 'lang.es' : 'lang.en') | t" (click)="i18n.setLang(l)">{{ l.toUpperCase() }}</button>
       }
     </div>
   `,

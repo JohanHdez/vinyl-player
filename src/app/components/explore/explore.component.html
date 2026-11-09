@@ -1,7 +1,7 @@
 @if (canGoBack()) {
   <button type="button" class="ex-back" (click)="back()">
     <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" /></svg>
-    Atrás
+    {{ 'player.ex.back' | t }}
   </button>
 }
 
@@ -9,8 +9,8 @@
   <!-- ═══ INICIO DE EXPLORAR ═══ -->
   @case ('home') {
     <div class="view-header">
-      <h1 class="view-title font-display">Explorar</h1>
-      <p class="view-subtitle">Géneros, estados de ánimo y los artistas que más suenan</p>
+      <h1 class="view-title font-display">{{ 'player.nav.explore' | t }}</h1>
+      <p class="view-subtitle">{{ 'player.ex.subtitle' | t }}</p>
     </div>
 
     @if (loading() && !home()) {
@@ -18,13 +18,13 @@
         @for (_ of [1, 2, 3, 4, 5, 6, 7, 8]; track $index) { <span class="ex-chip ex-chip--skeleton"></span> }
       </div>
     } @else if (failed()) {
-      <p class="ex-empty">No pude cargar Explorar. Revisa tu conexión e inténtalo de nuevo.</p>
+      <p class="ex-empty">{{ 'player.ex.failed' | t }}</p>
     }
 
     @if (home(); as h) {
       @if (h.artists.length) {
         <section class="ex-section">
-          <h2 class="ex-heading">Artistas principales</h2>
+          <h2 class="ex-heading">{{ 'player.ex.topArtists' | t }}</h2>
           <div class="ex-artists">
             @for (artist of h.artists; track artist.id) {
               <button type="button" class="ex-artist" (click)="openArtist(artist)">
@@ -57,23 +57,23 @@
     @if (page(); as p) {
       @if (p.kind === 'category') {
         <div class="ex-hero" [style.--stripe]="p.category.color">
-          <span class="ex-hero-kicker">Categoría</span>
+          <span class="ex-hero-kicker">{{ 'player.ex.category' | t }}</span>
           <h1 class="view-title font-display">{{ p.category.title }}</h1>
           @if (p.data?.songs?.length) {
             <div class="ex-actions">
-              <button type="button" class="ex-btn ex-btn--primary" (click)="playAll(p.data?.songs)">▶ Reproducir</button>
-              <button type="button" class="ex-btn" (click)="queueAll(p.data?.songs)">Agregar todo a la cola</button>
+              <button type="button" class="ex-btn ex-btn--primary" (click)="playAll(p.data?.songs)">{{ 'player.ex.play' | t }}</button>
+              <button type="button" class="ex-btn" (click)="queueAll(p.data?.songs)">{{ 'player.ex.queueAll' | t }}</button>
             </div>
           }
         </div>
 
-        @if (loading()) { <p class="ex-loading">Cargando {{ p.category.title }}…</p> }
-        @if (failed()) { <p class="ex-empty">No pude cargar esta categoría.</p> }
+        @if (loading()) { <p class="ex-loading">{{ 'player.ex.loadingCategory' | t: { name: p.category.title } }}</p> }
+        @if (failed()) { <p class="ex-empty">{{ 'player.ex.failedCategory' | t }}</p> }
 
         @if (p.data; as d) {
           @if (d.playlists.length) {
             <section class="ex-section">
-              <h2 class="ex-heading">Listas destacadas</h2>
+              <h2 class="ex-heading">{{ 'player.ex.featured' | t }}</h2>
               <div class="ex-cards">
                 @for (pl of d.playlists; track pl.id) {
                   <button type="button" class="ex-card" (click)="openPlaylist(pl)">
@@ -86,7 +86,7 @@
             </section>
           }
           @if (d.songs.length) {
-            <app-trending-grid heading="Canciones" [songs]="d.songs" (playNow)="playNow($event)" (addToPlaylist)="add($event)"></app-trending-grid>
+            <app-trending-grid [heading]="'player.ex.songs' | t" [songs]="d.songs" (playNow)="playNow($event)" (addToPlaylist)="add($event)"></app-trending-grid>
           }
         }
       }
@@ -104,27 +104,27 @@
             } @else { {{ initials(p.artist.name) }} }
           </span>
           <div>
-            <span class="ex-hero-kicker">Artista</span>
+            <span class="ex-hero-kicker">{{ 'player.ex.artist' | t }}</span>
             <h1 class="view-title font-display">{{ p.data?.name || p.artist.name }}</h1>
             @if (p.data?.songs?.length) {
               <div class="ex-actions">
-                <button type="button" class="ex-btn ex-btn--primary" (click)="playAll(p.data?.songs)">▶ Reproducir</button>
-                <button type="button" class="ex-btn" (click)="queueAll(p.data?.songs)">Agregar todo a la cola</button>
+                <button type="button" class="ex-btn ex-btn--primary" (click)="playAll(p.data?.songs)">{{ 'player.ex.play' | t }}</button>
+                <button type="button" class="ex-btn" (click)="queueAll(p.data?.songs)">{{ 'player.ex.queueAll' | t }}</button>
               </div>
             }
           </div>
         </div>
 
-        @if (loading()) { <p class="ex-loading">Cargando a {{ p.artist.name }}…</p> }
-        @if (failed()) { <p class="ex-empty">No pude cargar este artista.</p> }
+        @if (loading()) { <p class="ex-loading">{{ 'player.ex.loadingArtist' | t: { name: p.artist.name } }}</p> }
+        @if (failed()) { <p class="ex-empty">{{ 'player.ex.failedArtist' | t }}</p> }
 
         @if (p.data; as d) {
           <section class="ex-section">
-            <app-search-results heading="Las más escuchadas" [results]="d.songs" [visible]="true" (playNow)="playNow($event)" (addToPlaylist)="add($event)"></app-search-results>
+            <app-search-results [heading]="'player.ex.topSongs' | t" [results]="d.songs" [visible]="true" (playNow)="playNow($event)" (addToPlaylist)="add($event)"></app-search-results>
           </section>
           @if (d.related.length) {
             <section class="ex-section">
-              <h2 class="ex-heading">Puede que también te guste</h2>
+              <h2 class="ex-heading">{{ 'player.ex.related' | t }}</h2>
               <div class="ex-artists">
                 @for (artist of d.related; track artist.id) {
                   <button type="button" class="ex-artist" (click)="openArtist(artist)">
@@ -150,21 +150,21 @@
         <div class="ex-artist-hero">
           <img class="ex-cover" [src]="p.playlist.thumb" alt="" referrerpolicy="no-referrer" />
           <div>
-            <span class="ex-hero-kicker">Lista</span>
+            <span class="ex-hero-kicker">{{ 'player.ex.playlist' | t }}</span>
             <h1 class="view-title font-display">{{ p.data?.title || p.playlist.title }}</h1>
             <p class="view-subtitle">{{ p.playlist.subtitle }}</p>
             @if (p.data?.songs?.length) {
               <div class="ex-actions">
-                <button type="button" class="ex-btn ex-btn--primary" (click)="playAll(p.data?.songs)">▶ Reproducir</button>
-                <button type="button" class="ex-btn" (click)="queueAll(p.data?.songs)">Agregar {{ p.data?.songs?.length }} a la cola</button>
+                <button type="button" class="ex-btn ex-btn--primary" (click)="playAll(p.data?.songs)">{{ 'player.ex.play' | t }}</button>
+                <button type="button" class="ex-btn" (click)="queueAll(p.data?.songs)">{{ 'player.ex.queueCount' | t: { count: p.data?.songs?.length ?? 0 } }}</button>
               </div>
             }
           </div>
         </div>
-        @if (loading()) { <p class="ex-loading">Cargando la lista…</p> }
-        @if (failed()) { <p class="ex-empty">No pude cargar esta lista.</p> }
+        @if (loading()) { <p class="ex-loading">{{ 'player.ex.loadingPlaylist' | t }}</p> }
+        @if (failed()) { <p class="ex-empty">{{ 'player.ex.failedPlaylist' | t }}</p> }
         @if (p.data; as d) {
-          <app-search-results [heading]="d.songs.length + ' canciones'" [results]="d.songs" [visible]="true" (playNow)="playNow($event)" (addToPlaylist)="add($event)"></app-search-results>
+          <app-search-results [heading]="'player.ex.songCount' | t: { count: d.songs.length }" [results]="d.songs" [visible]="true" (playNow)="playNow($event)" (addToPlaylist)="add($event)"></app-search-results>
         }
       }
     }

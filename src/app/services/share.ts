@@ -1,6 +1,11 @@
 // Enlaces para compartir canciones y salas (funciones puras, ver share.spec.ts).
 
 import { Song } from '../models/song.model';
+import { TKey } from '../i18n/dict';
+import { Params } from '../i18n/part';
+
+/** Traductor que se recibe desde afuera (I18nService.t o translate(lang, ...) en las pruebas). */
+export type Translate = (key: TKey, params?: Params) => string;
 
 const VIDEO_ID = /^[a-zA-Z0-9_-]{11}$/;
 
@@ -20,18 +25,21 @@ export function roomLink(origin: string, code: string): string {
   return `${origin}/?jam=${encodeURIComponent(code.toUpperCase())}`;
 }
 
-export function songShare(origin: string, song: Song): ShareContent {
-  const who = song.channel ? ` de ${song.channel}` : '';
+export function songShare(origin: string, song: Song, t: Translate): ShareContent {
   return {
-    text: `🎵 Escucha «${song.title}»${who} conmigo en Vinyl`,
+    text: song.channel
+      ? t('player.share.songBy', { title: song.title, artist: song.channel })
+      : t('player.share.song', { title: song.title }),
     url: songLink(origin, song.videoId),
   };
 }
 
-export function roomShare(origin: string, code: string, songTitle?: string): ShareContent {
-  const now = songTitle ? ` Ahora suena «${songTitle}».` : '';
+export function roomShare(origin: string, code: string, t: Translate, songTitle?: string): ShareContent {
+  const upper = code.toUpperCase();
   return {
-    text: `🎧 Únete a mi sala en Vinyl (código ${code.toUpperCase()}): chateamos y armamos la música entre todos.${now}`,
+    text: songTitle
+      ? t('player.share.roomNow', { code: upper, title: songTitle })
+      : t('player.share.room', { code: upper }),
     url: roomLink(origin, code),
   };
 }

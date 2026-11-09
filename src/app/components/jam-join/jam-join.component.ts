@@ -2,12 +2,13 @@ import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { JamService } from '../../services/jam.service';
 import { ListenChoiceComponent } from '../listen-choice/listen-choice.component';
+import { I18nService, TPipe } from '../../i18n/i18n.service';
 
 /** Diálogo que aparece al abrir un enlace de invitación (?jam=CÓDIGO). */
 @Component({
   selector: 'app-jam-join',
   standalone: true,
-  imports: [FormsModule, ListenChoiceComponent],
+  imports: [FormsModule, ListenChoiceComponent, TPipe],
   templateUrl: './jam-join.component.html',
   styleUrl: './jam-join.component.scss',
 })
@@ -17,7 +18,7 @@ export class JamJoinComponent implements OnInit {
   /** Lo que eligió la última vez (por defecto: escuchar en la sala). */
   listenHere = false;
 
-  constructor(public jam: JamService) {}
+  constructor(public jam: JamService, private i18n: I18nService) {}
 
   get isOpen(): boolean {
     return this.jam.joinDialogOpen();
@@ -33,7 +34,7 @@ export class JamJoinComponent implements OnInit {
     const c = this.code.trim().toUpperCase();
     if (!c) return;
     this.jam.setListenHere(this.listenHere);
-    this.jam.joinSession(c, this.name.trim() || 'Invitado');
+    this.jam.joinSession(c, this.name.trim() || this.i18n.t('rooms.defaultGuest'));
     this.cleanUrl();
   }
 

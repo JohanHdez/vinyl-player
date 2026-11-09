@@ -10,6 +10,7 @@ import { PlayerStateService } from '../../services/player-state.service';
 import { YouTubeService } from '../../services/youtube.service';
 import { ShareButtonComponent } from '../share-button/share-button.component';
 import { SongPickerComponent } from '../song-picker/song-picker.component';
+import { I18nService, TPipe } from '../../i18n/i18n.service';
 
 /** Una vez que la persona usó el botón de música, deja de brillar para llamar la atención. */
 const MUSIC_HINT_KEY = 'vinyl.musicHintSeen';
@@ -20,7 +21,7 @@ const AVATAR_COLORS = ['#c44b3f', '#c8984c', '#3d8bd9', '#3f9b6a', '#9b6bd1', '#
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [ShareButtonComponent, SongPickerComponent],
+  imports: [ShareButtonComponent, SongPickerComponent, TPipe],
   templateUrl: './chat.component.html',
   styleUrl: './chat.component.scss',
 })
@@ -28,6 +29,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   readonly jam = inject(JamService);
   private readonly state = inject(PlayerStateService);
   private readonly yt = inject(YouTubeService);
+  readonly i18n = inject(I18nService);
 
   @ViewChild('scroller') private scroller?: ElementRef<HTMLElement>;
 
@@ -43,7 +45,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   private readonly playingIndex = signal(-1);
 
   readonly view = computed<ViewMessage[]>(() => toViewMessages(this.jam.messages(), this.jam.myId));
-  readonly typingText = computed(() => typingLabel(this.jam.typing()));
+  readonly typingText = computed(() => typingLabel(this.jam.typing(), (key, params) => this.i18n.t(key, params)));
 
   private subs: Subscription[] = [];
   private lastCount = 0;
@@ -160,7 +162,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   // ── Presentación ────────────────────────────────────────
 
   time(ts: number): string {
-    return new Date(ts).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+    // Hora con el formato del idioma elegido (se recalcula al cambiarlo).
+    const locale = this.i18n.lang() === 'en' ? 'en-US' : 'es-CO';
+    return new Date(ts).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
   }
 
   initial(name: string): string {

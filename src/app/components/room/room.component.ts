@@ -8,25 +8,29 @@ import { JamPanelComponent } from '../jam-panel/jam-panel.component';
 import { PlaylistComponent } from '../playlist/playlist.component';
 import { ShareButtonComponent } from '../share-button/share-button.component';
 import { ListenChoiceComponent } from '../listen-choice/listen-choice.component';
+import { I18nService, TPipe } from '../../i18n/i18n.service';
+import { TKey } from '../../i18n/dict';
 
 const NAME_KEY = 'vinyl_jam_name';
 
 @Component({
   selector: 'app-room',
   standalone: true,
-  imports: [ChatComponent, JamPanelComponent, PlaylistComponent, ShareButtonComponent, ListenChoiceComponent],
+  imports: [ChatComponent, JamPanelComponent, PlaylistComponent, ShareButtonComponent, ListenChoiceComponent, TPipe],
   templateUrl: './room.component.html',
   styleUrl: './room.component.scss',
 })
 export class RoomComponent implements OnInit, OnDestroy {
   readonly jam = inject(JamService);
   private readonly state = inject(PlayerStateService);
+  private readonly i18n = inject(I18nService);
 
   readonly ideas = ROOM_NAME_IDEAS;
   readonly name = signal(localStorage.getItem(NAME_KEY) ?? '');
   readonly roomName = signal('');
   readonly code = signal(this.jam.pendingJamCode());
-  readonly error = signal('');
+  /** Clave del error a mostrar (se traduce en la plantilla, así cambia con el idioma). */
+  readonly error = signal<TKey | null>(null);
   /** ¿Dónde quiere escuchar quien se une? Por defecto, lo que eligió la última vez. */
   listenHere = this.jam.listenHere();
   readonly mode = signal<'create' | 'join'>(this.jam.pendingJamCode() ? 'join' : 'create');
@@ -79,17 +83,22 @@ export class RoomComponent implements OnInit, OnDestroy {
   private validName(): string | null {
     const name = this.name().trim().replace(/\s+/g, ' ').slice(0, 30);
     if (!name) {
-      this.error.set('Escribe tu nombre para que los demás sepan quién eres.');
+      this.error.set('rooms.error.name');
       return null;
     }
-    this.error.set('');
+    this.error.set(null);
     return name;
+  }
+
+  /** Usa una idea de nombre, en el idioma actual. */
+  pickIdea(key: TKey): void {
+    this.roomName.set(this.i18n.t(key));
   }
 
   create(): void {
     const name = this.validName();
     if (!name) return;
-    const room = cleanRoomName(this.roomName()) || `Sala de ${name}`;
+    const room = cleanRoomName(this.roomName()) || this.i18n.t('rooms.defaultRoom', { name });
     this.jam.createSession(name, room);
   }
 
@@ -98,7 +107,7 @@ export class RoomComponent implements OnInit, OnDestroy {
     const code = this.code().trim().toUpperCase();
     if (!name) return;
     if (!/^[A-Z0-9]{6}$/.test(code)) {
-      this.error.set('El código tiene 6 letras o números.');
+      this.error.set('rooms.error.code');
       return;
     }
     this.jam.setListenHere(this.listenHere);
@@ -106,7 +115,7 @@ export class RoomComponent implements OnInit, OnDestroy {
   }
 
   open(code: string): void {
-    if (!this.name().trim()) this.name.set('Anfitrión');
+    if (!this.name().trim()) this.name.set(this.i18n.t('rooms.defaultHost'));
     this.jam.openMyRoom(code);
   }
 

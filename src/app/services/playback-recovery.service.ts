@@ -5,6 +5,7 @@ import { JamService } from './jam.service';
 import { PlayerStateService } from './player-state.service';
 import { YouTubeService } from './youtube.service';
 import { BLOCKED_ERRORS, MAX_ATTEMPTS, rankAlternatives, searchQueryFor } from './recovery';
+import { I18nService } from '../i18n/i18n.service';
 
 /** Recuperación en curso para una posición de la cola. */
 interface Attempt {
@@ -24,6 +25,7 @@ export class PlaybackRecoveryService {
   private readonly state = inject(PlayerStateService);
   private readonly yt = inject(YouTubeService);
   private readonly jam = inject(JamService);
+  private readonly i18n = inject(I18nService);
 
   private attempt: Attempt | null = null;
   private started = false;
@@ -40,19 +42,19 @@ export class PlaybackRecoveryService {
     if (!song || song.videoId !== videoId) return;
 
     if (!BLOCKED_ERRORS.has(code)) {
-      this.skip('Esta canción no se puede reproducir. Paso a la siguiente…');
+      this.skip(this.i18n.t('player.rec.cantPlay'));
       return;
     }
 
     // En una sala, el anfitrión busca la otra versión y la comparte con todos.
     if (this.jam.isInSession() && !this.jam.isHost()) {
-      this.state.toast$.next('Esa versión está bloqueada fuera de YouTube; el anfitrión buscará otra…');
+      this.state.toast$.next(this.i18n.t('player.rec.hostWillFind'));
       return;
     }
 
     // Primer error en esta posición: busca versiones alternativas una sola vez.
     if (!this.attempt || this.attempt.index !== index) {
-      this.state.toast$.next(`«${song.title}» no se puede reproducir aquí. Buscando otra versión…`);
+      this.state.toast$.next(this.i18n.t('player.rec.searching', { title: song.title }));
       const tried = new Set([song.videoId]);
       const results = await this.yt.search(searchQueryFor(song));
       this.attempt = { index, original: song, candidates: rankAlternatives(song, results, tried), tried };
@@ -70,7 +72,7 @@ export class PlaybackRecoveryService {
     if (!next) {
       this.state.replaceSong(attempt.index, attempt.original);
       this.attempt = null;
-      this.skip(`Ninguna versión de «${attempt.original.title}» se puede reproducir fuera de YouTube. Paso a la siguiente.`);
+      this.skip(this.i18n.t('player.rec.noVersion', { title: attempt.original.title }));
       return;
     }
 
@@ -83,8 +85,12 @@ export class PlaybackRecoveryService {
     this.state.isPlaying$.pipe(filter(Boolean), take(1)).subscribe(() => {
       if (this.attempt === attempt && this.state.currentSong$.value?.videoId === replacement.videoId) {
         this.attempt = null;
-        const by = replacement.channel ? ` (${replacement.channel})` : '';
-        this.state.toast$.next(`Esa versión estaba bloqueada; puse otra de «${attempt.original.title}»${by}`);
+        const title = attempt.original.title;
+        this.state.toast$.next(
+          replacement.channel
+            ? this.i18n.t('player.rec.replacedBy', { title, channel: replacement.channel })
+            : this.i18n.t('player.rec.replaced', { title })
+        );
       }
     });
   }

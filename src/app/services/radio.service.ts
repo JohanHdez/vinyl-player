@@ -4,6 +4,7 @@ import { JamService } from './jam.service';
 import { PlayerStateService } from './player-state.service';
 import { YouTubeService } from './youtube.service';
 import { RADIO_BATCH, pickRadioSongs, shouldExtend, withoutQueued } from './queue';
+import { I18nService } from '../i18n/i18n.service';
 
 /**
  * "Más de esto mismo": a partir de la canción que suena,
@@ -16,6 +17,7 @@ export class RadioService {
   private readonly state = inject(PlayerStateService);
   private readonly yt = inject(YouTubeService);
   private readonly jam = inject(JamService);
+  private readonly i18n = inject(I18nService);
 
   /** Canción a partir de la cual se calculan las sugerencias. */
   readonly seed = signal<Song | null>(null);
@@ -74,7 +76,7 @@ export class RadioService {
   /** Agrega varias sugerencias de una vez. */
   addMany(songs: Song[]): void {
     const added = this.state.addManyToPlaylist(songs.map(s => ({ ...s, source: 'user' as const })));
-    this.state.toast$.next(added ? `${added} canciones agregadas a la cola` : 'Ya estaban en la cola');
+    this.state.toast$.next(added ? this.i18n.t('player.toast.addedMany', { count: added }) : this.i18n.t('player.toast.alreadyQueued'));
   }
 
   // ── Internos ──────────────────────────────────────────────
@@ -118,13 +120,13 @@ export class RadioService {
     const exclude = new Set([...this.state.playedIds, ...this.state.playlist$.value.map(s => s.videoId)]);
     const picked = pickRadioSongs(candidates, exclude, RADIO_BATCH);
     const added = this.state.addManyToPlaylist(picked);
-    if (added) this.state.toast$.next(`Radio: ${added} canciones parecidas en camino`);
+    if (added) this.state.toast$.next(this.i18n.t('player.toast.radioAdded', { count: added }));
     return added;
   }
 
   private async onQueueEnded(last: Song | null): Promise<void> {
     if (!this.autoplay() || !this.canControlQueue()) {
-      this.state.toast$.next('Se acabó la cola. Activa la radio para seguir con canciones parecidas.');
+      this.state.toast$.next(this.i18n.t('player.toast.queueEnded'));
       return;
     }
     if (last && this.seed()?.videoId !== last.videoId) this.seed.set(last);
@@ -133,7 +135,7 @@ export class RadioService {
     if (added) {
       this.state.play(before);
     } else {
-      this.state.toast$.next('No encontré más canciones parecidas. Busca algo nuevo para seguir.');
+      this.state.toast$.next(this.i18n.t('player.toast.noMoreSimilar'));
     }
   }
 }

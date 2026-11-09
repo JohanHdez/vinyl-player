@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ChatMessage } from '../models/chat.model';
-import { GROUP_WINDOW_MS, cardState, toViewMessages, typingLabel } from './chat-view';
+import { GROUP_WINDOW_MS, Translate, cardState, toViewMessages, typingLabel } from './chat-view';
+import { translate } from '../i18n/i18n.service';
 
 let n = 0;
 const msg = (over: Partial<ChatMessage>): ChatMessage => ({
@@ -44,11 +45,20 @@ describe('toViewMessages', () => {
 });
 
 describe('typingLabel', () => {
+  const es: Translate = (k, p) => translate('es', k, p);
+  const en: Translate = (k, p) => translate('en', k, p);
+
   it('describe quién escribe', () => {
-    expect(typingLabel([])).toBe('');
-    expect(typingLabel(['Ana'])).toBe('Ana está escribiendo…');
-    expect(typingLabel(['Ana', 'Luis'])).toBe('Ana y Luis están escribiendo…');
-    expect(typingLabel(['A', 'B', 'C'])).toBe('Varias personas están escribiendo…');
+    expect(typingLabel([], es)).toBe('');
+    expect(typingLabel(['Ana'], es)).toBe('Ana está escribiendo…');
+    expect(typingLabel(['Ana', 'Luis'], es)).toBe('Ana y Luis están escribiendo…');
+    expect(typingLabel(['A', 'B', 'C'], es)).toBe('Varias personas están escribiendo…');
+  });
+
+  it('también en inglés', () => {
+    expect(typingLabel(['Ana'], en)).toBe('Ana is typing…');
+    expect(typingLabel(['Ana', 'Luis'], en)).toBe('Ana and Luis are typing…');
+    expect(typingLabel(['A', 'B', 'C'], en)).toBe('Several people are typing…');
   });
 });
 

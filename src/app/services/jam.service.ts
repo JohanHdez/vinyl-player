@@ -142,7 +142,7 @@ export class JamService {
     const room = this.myRooms().find(r => r.code === code);
     if (!room) return;
     this.connect();
-    this.socket!.emit('rejoin-session', { code, name: this.myName() || 'Anfitrión', ...this.keysFor(code) });
+    this.socket!.emit('rejoin-session', { code, name: this.myName() || this.i18n.t('rooms.defaultHost'), ...this.keysFor(code) });
   }
 
   forgetMyRoom(code: string): void {
@@ -172,15 +172,15 @@ export class JamService {
     if (!this.isInSession() || this.isHost()) return;
     if (!on) {
       this.yt.pause();
-      this.state.toast$.next('Listo: tu celular vuelve a ser solo control');
+      this.state.toast$.next(this.i18n.t('rooms.toast.remoteOnly'));
       return;
     }
     const index = this.state.currentIndex;
     if (index >= 0 && this.hostOnline()) {
       this.followHere(index, this.roomTime(), this.roomClock.playing);
-      this.state.toast$.next('🎧 Escuchando la sala en este dispositivo');
+      this.state.toast$.next(this.i18n.t('rooms.toast.listening'));
     } else {
-      this.state.toast$.next('🎧 Cuando suene algo en la sala, también lo escucharás aquí');
+      this.state.toast$.next(this.i18n.t('rooms.toast.listenLater'));
     }
   }
 
@@ -463,7 +463,7 @@ export class JamService {
     });
 
     socket.on('session-created', (data: RoomSnapshot & { hostKey: string }) => {
-      this.saveRooms(rememberRoom(this.myRooms(), { code: data.code, name: data.roomName ?? 'Sala', hostKey: data.hostKey, createdAt: Date.now() }));
+      this.saveRooms(rememberRoom(this.myRooms(), { code: data.code, name: data.roomName ?? this.i18n.t('rooms.room'), hostKey: data.hostKey, createdAt: Date.now() }));
       this.enterRoom({ ...data, isHost: true });
     });
 
@@ -582,7 +582,7 @@ export class JamService {
       this.rejoinCode = '';
       this.stopSyncInterval();
       this.resetRoomState();
-      this.state.toast$.next(`${data.by} te sacó de la sala`);
+      this.state.toast$.next(this.i18n.t('rooms.toast.kicked', { by: data.by }));
     });
 
     socket.on('cohost-granted', (data: { code: string; roomName: string; cohostKey: string }) => {
@@ -591,14 +591,14 @@ export class JamService {
         code: data.code, name: data.roomName, hostKey: prev?.hostKey ?? '', cohostKey: data.cohostKey, createdAt: prev?.createdAt ?? Date.now(),
       }));
       this.isCohost.set(true);
-      this.state.toast$.next('🎛️ Ahora eres co-anfitrión: puedes manejar la música de la sala');
+      this.state.toast$.next(this.i18n.t('rooms.toast.cohostOn'));
     });
 
     socket.on('cohost-revoked', (data: { code: string }) => {
       this.isCohost.set(false);
       const room = this.myRooms().find(r => r.code === data.code);
       if (room && !room.hostKey) this.forgetMyRoom(data.code);
-      this.state.toast$.next('Ya no eres co-anfitrión de la sala');
+      this.state.toast$.next(this.i18n.t('rooms.toast.cohostOff'));
     });
 
     socket.on('host-granted', (data: { code: string; roomName: string; hostKey: string; state: SyncState }) => {
@@ -609,7 +609,7 @@ export class JamService {
       this.hostOnline.set(true);
       this.remote(() => this.applySyncState(data.state));
       this.startSyncInterval();
-      this.state.toast$.next('🎚️ Ahora eres el anfitrión: la música suena en este dispositivo');
+      this.state.toast$.next(this.i18n.t('rooms.toast.hostOn'));
     });
 
     socket.on('host-revoked', (data: { code: string }) => {
@@ -622,7 +622,7 @@ export class JamService {
       } else {
         this.yt.pause();
       }
-      this.state.toast$.next('Pasaste el mando: la música ahora suena en el otro dispositivo');
+      this.state.toast$.next(this.i18n.t('rooms.toast.hostOff'));
     });
 
     // Anfitrión: ejecuta lo que pide un co-anfitrión (la música suena aquí).
@@ -658,7 +658,7 @@ export class JamService {
       localStorage.removeItem(KEY_CURRENT);
       this.rejoinCode = '';
       this.resetRoomState();
-      this.state.toast$.next('Esa sala ya no existe. Puedes crear una nueva.');
+      this.state.toast$.next(this.i18n.t('rooms.toast.expired'));
     });
 
     socket.on('error', (data: ServerError) => this.toastServer(data));

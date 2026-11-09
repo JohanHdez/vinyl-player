@@ -2,6 +2,7 @@ import { Component, ElementRef, HostListener, Input, computed, inject, signal } 
 import { Song } from '../../models/song.model';
 import { PlayerStateService } from '../../services/player-state.service';
 import { ShareContent, roomShare, songShare, whatsappUrl } from '../../services/share';
+import { I18nService, TPipe } from '../../i18n/i18n.service';
 
 /**
  * Botón "Compartir" con menú: WhatsApp, copiar enlace y el menú nativo del
@@ -10,12 +11,14 @@ import { ShareContent, roomShare, songShare, whatsappUrl } from '../../services/
 @Component({
   selector: 'app-share-button',
   standalone: true,
+  imports: [TPipe],
   templateUrl: './share-button.component.html',
   styleUrl: './share-button.component.scss',
 })
 export class ShareButtonComponent {
   private readonly state = inject(PlayerStateService);
   private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly i18n = inject(I18nService);
 
   private readonly _song = signal<Song | null>(null);
   private readonly _room = signal('');
@@ -26,18 +29,21 @@ export class ShareButtonComponent {
   @Input() set roomCode(value: string | null | undefined) { this._room.set(value ?? ''); }
   /** Título de lo que suena, para mencionarlo en la invitación a la sala. */
   @Input() set nowPlaying(value: string | null | undefined) { this._nowPlaying.set(value ?? ''); }
-  @Input() label = 'Compartir';
+  /** Texto del botón; si viene vacío dice "Compartir" en el idioma elegido. */
+  @Input() label = '';
   /** `pill`: botón con texto · `icon`: solo ícono · `inline`: texto pequeño (tarjetas del chat). */
   @Input() variant: 'pill' | 'icon' | 'inline' = 'pill';
 
   readonly open = signal(false);
   readonly canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
+  // Lee el idioma dentro del computed: el texto cambia si la persona cambia de idioma.
   readonly content = computed<ShareContent | null>(() => {
     const origin = location.origin;
-    if (this._room()) return roomShare(origin, this._room(), this._nowPlaying() || undefined);
+    const t = this.i18n.t.bind(this.i18n);
+    if (this._room()) return roomShare(origin, this._room(), t, this._nowPlaying() || undefined);
     const song = this._song();
-    return song ? songShare(origin, song) : null;
+    return song ? songShare(origin, song, t) : null;
   });
 
   readonly whatsapp = computed(() => {
@@ -57,9 +63,9 @@ export class ShareButtonComponent {
     if (!c) return;
     try {
       await navigator.clipboard.writeText(c.url);
-      this.state.toast$.next('Enlace copiado');
+      this.state.toast$.next(this.i18n.t('player.share.copied'));
     } catch {
-      window.prompt('Copia este enlace:', c.url);
+      window.prompt(this.i18n.t('player.share.copyPrompt'), c.url);
     }
     this.open.set(false);
   }

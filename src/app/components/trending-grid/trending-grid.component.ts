@@ -1,16 +1,18 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Song } from '../../models/song.model';
+import { TPipe } from '../../i18n/i18n.service';
 
 @Component({
   selector: 'app-trending-grid',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TPipe],
   templateUrl: './trending-grid.component.html',
   styleUrl: './trending-grid.component.scss',
 })
 export class TrendingGridComponent {
-  @Input() heading = 'Hits Mundiales';
+  /** Título de la sección; si viene vacío se muestra "Hits Mundiales" en el idioma elegido. */
+  @Input() heading = '';
   @Input() songs: Song[] = [];
   @Input() loading = false;
 

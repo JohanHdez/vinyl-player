@@ -1,10 +1,11 @@
-import { Injectable, NgZone } from '@angular/core';
+import { Injectable, NgZone, inject } from '@angular/core';
 import { Subject } from 'rxjs';
 import { PlayerStateService } from './player-state.service';
 import { Song } from '../models/song.model';
 import { ArtistPage, CategoryPage, ExploreHome, PlaylistPage } from '../models/explore.model';
 import { PROXY_URL } from './proxy-url';
 import { isBrowserPause } from './background-play';
+import { I18nService } from '../i18n/i18n.service';
 
 // Tipos mínimos del YouTube IFrame API: solo lo que usamos.
 interface YTPlayer {
@@ -55,6 +56,7 @@ export class YouTubeService {
   private reallyPlaying = false;
   private hiddenAt = 0;
   private resumeTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly i18n = inject(I18nService);
 
   constructor(
     private state: PlayerStateService,
@@ -169,7 +171,7 @@ export class YouTubeService {
     if (document.hidden) this.scheduleResume(1500);
     if (!this.player || !this.playerReady) {
       this.pendingVideoId = videoId;
-      this.state.toast$.next('Cargando reproductor...');
+      this.state.toast$.next(this.i18n.t('player.toast.loadingPlayer'));
       return;
     }
     this.player.loadVideoById(videoId);
@@ -322,7 +324,7 @@ export class YouTubeService {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       return await resp.json();
     } catch {
-      return { videoId, title: 'Video de YouTube', channel: '' };
+      return { videoId, title: this.i18n.t('player.yt.fallbackTitle'), channel: '' };
     }
   }
 }

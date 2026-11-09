@@ -1,7 +1,8 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { Song } from '../models/song.model';
 import { nextIndex, prevIndex } from './queue';
+import { I18nService } from '../i18n/i18n.service';
 
 const AUTOPLAY_KEY = 'vinyl.autoplay';
 
@@ -15,6 +16,7 @@ function readAutoplayPreference(): boolean {
 
 @Injectable({ providedIn: 'root' })
 export class PlayerStateService {
+  private readonly i18n = inject(I18nService);
   private playlist: Song[] = [];
   private _currentIndex = -1;
   /** Ids que ya sonaron en esta sesión: la radio no los repite. */
@@ -61,12 +63,12 @@ export class PlayerStateService {
 
   addToPlaylist(song: Song): boolean {
     if (this.playlist.some(s => s.videoId === song.videoId)) {
-      if (!this.suppressToast) this.toast$.next('Ya esta en la lista');
+      if (!this.suppressToast) this.toast$.next(this.i18n.t('player.toast.alreadyInList'));
       return false;
     }
     this.playlist.push(song);
     this.playlist$.next([...this.playlist]);
-    if (!this.suppressToast) this.toast$.next('Agregada a la lista');
+    if (!this.suppressToast) this.toast$.next(this.i18n.t('player.toast.addedToList'));
     if (this.onSongAdded) this.onSongAdded(song);
     return true;
   }
@@ -113,7 +115,7 @@ export class PlayerStateService {
   /** `remote`: el cambio viene de la sala (otro participante), no de esta persona. */
   removeFromPlaylist(index: number, { remote = false } = {}): void {
     if (this.guestMode && !remote) {
-      this.toast$.next('Solo el anfitrión puede quitar canciones de la sala');
+      this.toast$.next(this.i18n.t('player.toast.hostOnlyRemove'));
       return;
     }
     const wasPlaying = index === this._currentIndex;
@@ -138,7 +140,7 @@ export class PlayerStateService {
     if (index < 0 || index >= this.playlist.length) return;
     if (this.guestMode) {
       // Quien llamó ya la agregó a la cola: queda pedida y sonará cuando le toque.
-      this.toast$.next('Pedida 🎶 Sonará en la sala cuando le toque');
+      this.toast$.next(this.i18n.t('player.toast.requested'));
       return;
     }
     this._currentIndex = index;
@@ -181,13 +183,13 @@ export class PlayerStateService {
   toggleShuffle(): void {
     const val = !this.shuffle$.value;
     this.shuffle$.next(val);
-    this.toast$.next(val ? 'Aleatorio activado' : 'Aleatorio desactivado');
+    this.toast$.next(this.i18n.t(val ? 'player.toast.shuffleOn' : 'player.toast.shuffleOff'));
   }
 
   toggleRepeat(): void {
     const val = !this.repeat$.value;
     this.repeat$.next(val);
-    this.toast$.next(val ? 'Repetir activado' : 'Repetir desactivado');
+    this.toast$.next(this.i18n.t(val ? 'player.toast.repeatOn' : 'player.toast.repeatOff'));
   }
 
   setAutoplay(enabled: boolean): void {
@@ -197,7 +199,7 @@ export class PlayerStateService {
     } catch {
       // Sin almacenamiento (modo privado): la preferencia dura solo esta sesión.
     }
-    this.toast$.next(enabled ? 'Radio automática activada' : 'Radio automática desactivada');
+    this.toast$.next(this.i18n.t(enabled ? 'player.toast.autoplayOn' : 'player.toast.autoplayOff'));
   }
 
   setVolume(vol: number): void {

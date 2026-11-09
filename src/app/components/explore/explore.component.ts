@@ -5,6 +5,7 @@ import { PlayerStateService } from '../../services/player-state.service';
 import { YouTubeService } from '../../services/youtube.service';
 import { SearchResultsComponent } from '../search-results/search-results.component';
 import { TrendingGridComponent } from '../trending-grid/trending-grid.component';
+import { I18nService, TPipe } from '../../i18n/i18n.service';
 
 /** Pantallas dentro de Explorar; se apilan para poder volver atrás. */
 type Page =
@@ -16,13 +17,14 @@ type Page =
 @Component({
   selector: 'app-explore',
   standalone: true,
-  imports: [SearchResultsComponent, TrendingGridComponent],
+  imports: [SearchResultsComponent, TrendingGridComponent, TPipe],
   templateUrl: './explore.component.html',
   styleUrl: './explore.component.scss',
 })
 export class ExploreComponent implements OnInit {
   private readonly yt = inject(YouTubeService);
   private readonly state = inject(PlayerStateService);
+  private readonly i18n = inject(I18nService);
 
   readonly home = signal<ExploreHome | null>(null);
   readonly stack = signal<Page[]>([{ kind: 'home' }]);
@@ -89,13 +91,13 @@ export class ExploreComponent implements OnInit {
     const added = this.state.addManyToPlaylist(songs);
     const idx = this.state.playlist$.value.findIndex(s => s.videoId === songs[0].videoId);
     if (idx >= 0) this.state.play(idx);
-    this.state.toast$.next(added ? `${added} canciones en la cola` : 'Ya estaban en la cola');
+    this.state.toast$.next(added ? this.i18n.t('player.toast.inQueue', { count: added }) : this.i18n.t('player.toast.alreadyQueued'));
   }
 
   queueAll(songs: Song[] | undefined): void {
     if (!songs?.length) return;
     const added = this.state.addManyToPlaylist(songs);
-    this.state.toast$.next(added ? `${added} canciones agregadas a la cola` : 'Ya estaban en la cola');
+    this.state.toast$.next(added ? this.i18n.t('player.toast.addedMany', { count: added }) : this.i18n.t('player.toast.alreadyQueued'));
   }
 
   initials(name: string): string {

@@ -2,14 +2,14 @@
   @if (current(); as song) {
     <button type="button" class="picker-current" (click)="pick(song)">
       <img [src]="thumb(song.videoId)" alt="" />
-      <span><small>{{ currentLabel() }}</small>{{ song.title }}</span>
+      <span><small>{{ currentLabel() | t }}</small>{{ song.title }}</span>
     </button>
   }
   <form class="picker-search" (submit)="$event.preventDefault(); search()">
-    <input #field type="search" [placeholder]="placeholder()" [value]="query()" (input)="onInput($any($event.target).value)" aria-label="Buscar canción" />
-    <button type="submit">Buscar</button>
+    <input #field type="search" [placeholder]="placeholder() | t" [value]="query()" (input)="onInput($any($event.target).value)" [attr.aria-label]="'rooms.picker.aria' | t" />
+    <button type="submit">{{ 'rooms.picker.search' | t }}</button>
   </form>
-  @if (loading()) { <p class="picker-hint">Buscando…</p> }
+  @if (loading()) { <p class="picker-hint">{{ 'rooms.picker.searching' | t }}</p> }
   <ul class="picker-results">
     @for (song of results().slice(0, 6); track song.videoId) {
       <li>

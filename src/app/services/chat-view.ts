@@ -2,6 +2,11 @@
 
 import { ChatMessage, Reaction } from '../models/chat.model';
 import { Song } from '../models/song.model';
+import type { TKey } from '../i18n/dict';
+import type { Params } from '../i18n/part';
+
+/** Función que traduce una clave (I18nService.t o translate con un idioma fijo). */
+export type Translate = (key: TKey, params?: Params) => string;
 
 /** Mensajes seguidos del mismo autor dentro de esta ventana se agrupan (sin repetir nombre ni avatar). */
 export const GROUP_WINDOW_MS = 5 * 60 * 1000;
@@ -28,11 +33,11 @@ export function toViewMessages(list: ChatMessage[], myId: string): ViewMessage[]
   });
 }
 
-export function typingLabel(names: string[]): string {
+export function typingLabel(names: string[], t: Translate): string {
   if (names.length === 0) return '';
-  if (names.length === 1) return `${names[0]} está escribiendo…`;
-  if (names.length === 2) return `${names[0]} y ${names[1]} están escribiendo…`;
-  return 'Varias personas están escribiendo…';
+  if (names.length === 1) return t('rooms.typing.one', { name: names[0] });
+  if (names.length === 2) return t('rooms.typing.two', { a: names[0], b: names[1] });
+  return t('rooms.typing.many');
 }
 
 /** Estado de una canción compartida en el chat respecto a la cola de la sala. */

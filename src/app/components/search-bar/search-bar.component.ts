@@ -1,5 +1,6 @@
 import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnDestroy, Output, ViewChild, signal } from '@angular/core';
 import { MIN_QUERY_LENGTH, addRecent, readRecent, shouldSearch } from '../../services/search-input';
+import { TPipe } from '../../i18n/i18n.service';
 
 const DEBOUNCE_MS = 450;
 
@@ -10,6 +11,7 @@ const DEBOUNCE_MS = 450;
 @Component({
   selector: 'app-search-bar',
   standalone: true,
+  imports: [TPipe],
   templateUrl: './search-bar.component.html',
   styleUrl: './search-bar.component.scss',
 })

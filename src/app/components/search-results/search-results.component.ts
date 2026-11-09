@@ -1,16 +1,18 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Song } from '../../models/song.model';
+import { TPipe } from '../../i18n/i18n.service';
 
 @Component({
   selector: 'app-search-results',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TPipe],
   templateUrl: './search-results.component.html',
   styleUrl: './search-results.component.scss',
 })
 export class SearchResultsComponent {
-  @Input() heading = 'Resultados de búsqueda';
+  /** Título del panel; si viene vacío se muestra "Resultados de búsqueda" en el idioma elegido. */
+  @Input() heading = '';
   @Input() results: Song[] = [];
   @Input() loading = false;
   @Input() visible = false;

@@ -4,11 +4,12 @@ import { PlayerStateService } from '../../services/player-state.service';
 import { JamService } from '../../services/jam.service';
 import { Song } from '../../models/song.model';
 import { SongPickerComponent } from '../song-picker/song-picker.component';
+import { TPipe } from '../../i18n/i18n.service';
 
 @Component({
   selector: 'app-playlist',
   standalone: true,
-  imports: [SongPickerComponent],
+  imports: [SongPickerComponent, TPipe],
   templateUrl: './playlist.component.html',
   styleUrl: './playlist.component.scss',
 })

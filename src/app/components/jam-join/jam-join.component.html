@@ -3,26 +3,26 @@
     <div class="jam-join-dialog" role="dialog" aria-modal="true" aria-labelledby="join-title" (click)="$event.stopPropagation()">
       <div class="dialog-header" id="join-title">
         <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-        Te invitaron a una sala
+        {{ 'rooms.join.invited' | t }}
       </div>
 
       <div class="dialog-body">
-        <p class="join-explain">Desde tu celular pides canciones, votas y chateas.</p>
+        <p class="join-explain">{{ 'rooms.join.fine' | t }}</p>
 
-        <label class="field-label" for="join-name">Tu nombre</label>
-        <input id="join-name" type="text" class="field-input" placeholder="¿Cómo te llamamos?" [(ngModel)]="name" maxlength="30" (keydown.enter)="join()" autofocus />
+        <label class="field-label" for="join-name">{{ 'rooms.field.yourName' | t }}</label>
+        <input id="join-name" type="text" class="field-input" [placeholder]="'rooms.field.yourName.ph' | t" [(ngModel)]="name" maxlength="30" (keydown.enter)="join()" autofocus />
 
-        <label class="field-label" for="join-code">Código de la sala</label>
+        <label class="field-label" for="join-code">{{ 'rooms.field.code' | t }}</label>
         <input id="join-code" type="text" class="field-input field-code" placeholder="ABC123" [(ngModel)]="code" maxlength="6" (keydown.enter)="join()" />
 
         <app-listen-choice name="join-listen" [(here)]="listenHere"></app-listen-choice>
 
-        <p class="join-terms">Al entrar aceptas los <a href="/?view=terminos" target="_blank" rel="noopener">términos de uso</a>.</p>
+        <p class="join-terms">{{ 'rooms.terms.join' | t }} <a href="/?view=terminos" target="_blank" rel="noopener">{{ 'rooms.terms.link' | t }}</a>{{ 'rooms.terms.end' | t }}</p>
       </div>
 
       <div class="dialog-actions">
-        <button class="cancel-btn" (click)="close()">Cancelar</button>
-        <button class="join-btn" (click)="join()" [disabled]="!code.trim()">Entrar a la sala</button>
+        <button class="cancel-btn" (click)="close()">{{ 'rooms.join.cancel' | t }}</button>
+        <button class="join-btn" (click)="join()" [disabled]="!code.trim()">{{ 'rooms.join.enter' | t }}</button>
       </div>
     </div>
   </div>

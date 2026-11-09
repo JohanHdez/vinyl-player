@@ -4,6 +4,7 @@ import { JamService } from '../../services/jam.service';
 import { PlayerStateService } from '../../services/player-state.service';
 import { JamParticipant } from '../../models/jam-session.model';
 import { Song } from '../../models/song.model';
+import { I18nService, TPipe } from '../../i18n/i18n.service';
 
 const AVATAR_COLORS = [
   '#e94560', '#c9a84c', '#3498db', '#2ecc71',
@@ -13,7 +14,7 @@ const AVATAR_COLORS = [
 @Component({
   selector: 'app-jam-panel',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TPipe],
   templateUrl: './jam-panel.component.html',
   styleUrl: './jam-panel.component.scss',
 })
@@ -32,7 +33,8 @@ export class JamPanelComponent implements OnInit {
 
   constructor(
     private jam: JamService,
-    private state: PlayerStateService
+    private state: PlayerStateService,
+    private i18n: I18nService
   ) {}
 
   ngOnInit(): void {
@@ -62,13 +64,13 @@ export class JamPanelComponent implements OnInit {
   }
 
   transfer(p: JamParticipant): void {
-    if (confirm(`¿Pasarle el mando a ${p.name}? La música empezará a sonar en su dispositivo y tú quedarás como invitado.`)) {
+    if (confirm(this.i18n.t('rooms.panel.transferConfirm', { name: p.name }))) {
       this.jam.transferHost(p.id);
     }
   }
 
   kick(p: JamParticipant): void {
-    if (confirm(`¿Sacar a ${p.name} de la sala?`)) this.jam.kick(p.id);
+    if (confirm(this.i18n.t('rooms.panel.kickConfirm', { name: p.name }))) this.jam.kick(p.id);
   }
 
   thumbUrl(): string {

@@ -1,13 +1,13 @@
 <div class="jam-panel">
   <div class="jam-header">
     <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-    {{ roomName() || 'Sala activa' }}
+    {{ roomName() || ('rooms.panel.active' | t) }}
   </div>
 
   <!-- Now Playing -->
   @if (currentSong()) {
     <div class="now-playing">
-      <div class="now-playing-label">Reproduciendo:</div>
+      <div class="now-playing-label">{{ 'rooms.panel.nowPlaying' | t }}</div>
       <div class="now-playing-info">
         <img [src]="thumbUrl()" alt="" class="now-playing-thumb">
         <div class="now-playing-text">
@@ -19,9 +19,9 @@
   }
 
   <div class="jam-code-section">
-    <span class="jam-code-label">Código:</span>
+    <span class="jam-code-label">{{ 'rooms.panel.code' | t }}</span>
     <span class="jam-code">{{ sessionCode() }}</span>
-    <button class="copy-btn" (click)="copyCode()" title="Copiar código" aria-label="Copiar código">
+    <button class="copy-btn" (click)="copyCode()" [title]="'rooms.panel.copy' | t" [attr.aria-label]="'rooms.panel.copy' | t">
       <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
     </button>
   </div>
@@ -31,7 +31,7 @@
   </div>
 
   <div class="participants-section">
-    <div class="participants-label">Participantes ({{ participants().length }})</div>
+    <div class="participants-label">{{ 'rooms.panel.participants' | t: { n: participants().length } }}</div>
     <div class="participants-list">
       @for (p of participants(); track p.id; let i = $index) {
         <div class="participant">
@@ -40,21 +40,21 @@
           </div>
           <span class="participant-name">{{ p.name }}</span>
           @if (p.isHost) {
-            <span class="host-badge">Host</span>
+            <span class="host-badge">{{ 'rooms.panel.host' | t }}</span>
           } @else if (p.isCohost) {
-            <span class="host-badge cohost-badge">Co-host</span>
+            <span class="host-badge cohost-badge">{{ 'rooms.panel.cohost' | t }}</span>
           }
           @if (canManage(p)) {
             <div class="participant-actions">
               @if (isHost()) {
                 <button type="button" class="p-action" (click)="toggleCohost(p)"
-                  [attr.aria-label]="(p.isCohost ? 'Quitar co-anfitrión a ' : 'Hacer co-anfitrión a ') + p.name"
-                  [title]="p.isCohost ? 'Quitar co-anfitrión' : 'Hacer co-anfitrión'">{{ p.isCohost ? 'Quitar co-host' : 'Co-host' }}</button>
+                  [attr.aria-label]="(p.isCohost ? 'rooms.panel.cohostRemoveAria' : 'rooms.panel.cohostMakeAria') | t: { name: p.name }"
+                  [title]="(p.isCohost ? 'rooms.panel.cohostRemoveTitle' : 'rooms.panel.cohostMakeTitle') | t">{{ (p.isCohost ? 'rooms.panel.cohostRemove' : 'rooms.panel.cohostMake') | t }}</button>
                 <button type="button" class="p-action" (click)="transfer(p)"
-                  [attr.aria-label]="'Pasarle el mando a ' + p.name" title="Pasar el mando: la música sonará en su dispositivo">Pasar mando</button>
+                  [attr.aria-label]="'rooms.panel.transferAria' | t: { name: p.name }" [title]="'rooms.panel.transferTitle' | t">{{ 'rooms.panel.transfer' | t }}</button>
               }
               <button type="button" class="p-action danger" (click)="kick(p)"
-                [attr.aria-label]="'Sacar a ' + p.name + ' de la sala'" title="Sacar de la sala">Sacar</button>
+                [attr.aria-label]="'rooms.panel.kickAria' | t: { name: p.name }" [title]="'rooms.panel.kickTitle' | t">{{ 'rooms.panel.kick' | t }}</button>
             </div>
           }
 
@@ -63,5 +63,5 @@
     </div>
   </div>
 
-  <button class="leave-btn" (click)="leaveSession()">Salir de la sala</button>
+  <button class="leave-btn" (click)="leaveSession()">{{ 'rooms.panel.leave' | t }}</button>
 </div>

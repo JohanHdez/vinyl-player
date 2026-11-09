@@ -5,11 +5,12 @@ import { PlayerStateService } from '../../services/player-state.service';
 import { YouTubeService } from '../../services/youtube.service';
 import { JamService } from '../../services/jam.service';
 import { Song } from '../../models/song.model';
+import { TPipe } from '../../i18n/i18n.service';
 
 @Component({
   selector: 'app-player-controls',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TPipe],
   templateUrl: './player-controls.component.html',
   styleUrl: './player-controls.component.scss',
 })
