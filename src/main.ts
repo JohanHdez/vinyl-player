@@ -8,3 +8,11 @@ importFromOldDomain();
 
 bootstrapApplication(App, appConfig)
   .catch((err) => console.error(err));
+
+// PWA: el service worker (public/sw.js) hace la app instalable. En localhost no se
+// registra, para que el desarrollo no quede atado a archivos guardados.
+if ('serviceWorker' in navigator && location.hostname !== 'localhost') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => console.warn('[pwa] no se pudo registrar', err));
+  });
+}

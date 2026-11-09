@@ -74,6 +74,12 @@ Dockerfile                   # Multi-stage build (Angular + Node.js)
 docker-compose.yml           # Orquestacion con Docker Compose
 ```
 
+## PWA (instalable)
+- `public/manifest.webmanifest` + íconos en `public/icons/` (fuente `icon.svg`; los PNG se regeneran con
+  `node tools/make-icons.js <node_modules con sharp>`) + service worker `public/sw.js`, registrado en `src/main.ts`
+  (no en localhost).
+- El service worker nunca guarda `/api`, `/socket.io` ni nada de YouTube. Si cambias `sw.js`, sube `VERSION`.
+
 ## Patrones y Convenciones
 
 ### Arquitectura Angular
