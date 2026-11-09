@@ -207,27 +207,51 @@
   background: var(--bg-surface);
 
   textarea {
-    flex: 1;
+    // Base 0 y ancho 0: ocupa solo lo que sobra. Con field-sizing: content, el placeholder
+    // en una línea empujaba el ancho y sacaba el botón de enviar de la pantalla en 320px.
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
     resize: none;
+    // Una línea mide exactamente lo que los botones (44px: 11 + 20 + 11 + 2 de borde),
+    // así quedan alineados; al escribir varias líneas crece hacia arriba.
+    box-sizing: border-box;
+    min-height: 44px;
     max-height: 120px;
     field-sizing: content;
     font: inherit;
     font-size: 0.92rem;
-    padding: 10px 14px;
-    border-radius: 20px;
+    line-height: 20px;
+    padding: 11px 14px;
+    border-radius: 22px;
     border: 1px solid var(--glass-border);
     background: var(--bg-elevated);
     color: var(--text-primary);
 
     &:focus { outline: none; border-color: var(--accent-brass); }
+
+    // El texto de ayuda nunca se parte en dos líneas (si no cabe, termina en "…"):
+    // con field-sizing: content, un placeholder largo hacía crecer el campo en el celular.
+    &::placeholder {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    &:placeholder-shown {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
   }
 }
 
 .composer-music,
 .composer-send {
   flex: none;
-  width: 40px;
-  height: 40px;
+  // 44px: el mínimo táctil que pide styles.scss, igual en todas las pantallas para que
+  // los botones y el campo de texto midan lo mismo y queden alineados.
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 0;
   display: grid;
