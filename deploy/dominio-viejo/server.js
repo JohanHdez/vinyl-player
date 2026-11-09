@@ -12,7 +12,7 @@
 
 const http = require("http");
 
-const NEW_ORIGIN = (process.env.NEW_ORIGIN || "https://johan-hdez.up.railway.app").replace(/\/+$/, "");
+const NEW_ORIGIN = (process.env.NEW_ORIGIN || "https://johan-hdez-musica.up.railway.app").replace(/\/+$/, "");
 const PORT = Number(process.env.PORT) || 8080;
 const BOTS = /bot|crawl|spider|preview|facebookexternalhit|whatsapp|telegram|slack|discord|twitter|linkedin|skype|embedly/i;
 

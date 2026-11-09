@@ -1,6 +1,6 @@
 # Dominio viejo → nuevo
 
-La app se mudó de `irontfit-music.up.railway.app` a `johan-hdez.up.railway.app`.
+La app se mudó de `irontfit-music.up.railway.app` a `johan-hdez-musica.up.railway.app`.
 Railway permite un solo dominio propio por servicio, así que el nombre viejo lo ocupa
 este servicio aparte (`dominio-viejo`, en el proyecto `alert-acceptance`).
 
